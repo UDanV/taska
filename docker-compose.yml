@@ -1,0 +1,33 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: taska_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: taska
+      POSTGRES_PASSWORD: taska
+      POSTGRES_DB: taska_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  app:
+    build:
+      context: .
+    container_name: taska_app
+    restart: always
+    depends_on:
+      - postgres
+    environment:
+      DATABASE_URL: "postgresql://taska:taska@postgres:5432/taska_db"
+      NEXTAUTH_SECRET: "mYn9+2qFz5X8WpQa7rBvCjL0sEiKxNwPvQa7rBvCjL0sE="
+      NEXTAUTH_URL: "http://localhost:3000"
+    ports:
+      - "3000:3000"
+    command: sh -c "npx prisma migrate deploy && npm start"
+
+volumes:
+  postgres_data:
