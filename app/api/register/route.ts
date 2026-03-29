@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcrypt";
 import { registerSchema } from "@/app/lib/validation/auth.schema";
 import { prisma } from "@/app/lib/prisma";
-import { signIn } from "next-auth/react";
 
 export async function POST(req: Request) {
   try {
@@ -15,7 +14,11 @@ export async function POST(req: Request) {
 
     if (existingUser) {
       return NextResponse.json(
-        { error: "Email уже используется" },
+        {
+          error: existingUser.password
+            ? "Email is already in use"
+            : "Этот email уже привязан к аккаунту через соцсеть",
+        },
         { status: 400 },
       );
     }
@@ -30,15 +33,11 @@ export async function POST(req: Request) {
       },
     });
 
-    await signIn("credentials", {
-      email: data.email,
-      password: data.password,
-      redirect: false,
-    });
-
     return NextResponse.json({ success: true });
   } catch (error) {
-    return NextResponse.json({ error: "Ошибка регистрации" }, { status: 400 });
-    console.log(error);
+    return NextResponse.json(
+      { error: "Ошибка регистрации" },
+      { status: 400 }
+    );
   }
 }

@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
+import { getServerSession } from "next-auth";
 import { Manrope } from "next/font/google";
 import "./globals.css";
-import Header from "./feature/header";
-import { Footer } from "./feature/footer";
+import { authOptions } from "./lib/auth/options";
+import { Providers } from "./providers/toast";
 
 const manrope = Manrope({
   variable: "--font-manrope",
@@ -15,17 +16,17 @@ export const metadata: Metadata = {
   description: "Попробуйте сейчас. Бесплатно. Без ограничений. Навсегда.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
+  const session = await getServerSession(authOptions);
+
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={`${manrope.variable} antialiased`}>
-        <Header />
-        {children}
-        <Footer />
+        <Providers session={session}>{children}</Providers>
       </body>
     </html>
   );

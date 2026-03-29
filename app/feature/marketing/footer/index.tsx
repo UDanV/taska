@@ -8,11 +8,10 @@ export const Footer = () => {
           <span className="text-lg font-bold text-gradient"><LogoIcon /></span>
           <div className="flex gap-6 text-sm text-muted-foreground">
             <a href="#features" className="hover:text-foreground transition-colors">Возможности</a>
-            <a href="#pricing" className="hover:text-foreground transition-colors">Тарифы</a>
-            <a href="#" className="hover:text-foreground transition-colors">Блог</a>
-            <a href="#" className="hover:text-foreground transition-colors">Поддержка</a>
+            <a href="#how" className="hover:text-foreground transition-colors">Как это работает</a>
+            <a href="#testimonials" className="hover:text-foreground transition-colors">Отзывы</a>
           </div>
-          <p className="text-xs text-muted-foreground">© 2026 Taska. Все права защищены.</p>
+          <p className="text-xs text-muted-foreground">© {new Date().getFullYear()} Taska. Все права защищены.</p>
         </div>
       </div>
     </footer>

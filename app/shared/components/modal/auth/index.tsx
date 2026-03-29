@@ -1,48 +1,102 @@
-import { useState, useEffect } from "react";
-import { Loader2, X } from "lucide-react";
-import { Input } from "../../ui/input";
+import { useState, useEffect, type ReactNode } from "react";
+import { X } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { createPortal } from "react-dom";
-import { motion, AnimatePresence } from "motion/react";
+import {
+  Button,
+  Input,
+  Modal,
+  ModalBody,
+  ModalContent,
+  ModalHeader,
+} from "@heroui/react";
+import { getProviders } from "next-auth/react";
 import { YandexLogo } from "../../icons/common";
+import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 import {
   LoginData,
   loginSchema,
   RegisterData,
   registerSchema,
 } from "@/app/lib/validation/auth.schema";
-import { login, register } from "@/app/shared/services/auth";
+import {
+  login,
+  register,
+  socialLogin,
+  type SocialAuthProvider,
+} from "@/app/shared/services/auth";
+
+const socialProviderMeta: Record<
+  SocialAuthProvider,
+  { label: string; icon: ReactNode }
+> = {
+  vk: {
+    label: "Продолжить через VK ID",
+    icon: (
+      <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#0077FF] text-xs font-semibold text-white">
+        VK
+      </span>
+    ),
+  },
+  yandex: {
+    label: "Продолжить через Яндекс ID",
+    icon: <YandexLogo size={24} />,
+  },
+  mailru: {
+    label: "Продолжить через Mail.ru",
+    icon: (
+      <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#005FF9] text-xs font-semibold text-white">
+        @
+      </span>
+    ),
+  },
+};
+
+const socialProviderOrder: SocialAuthProvider[] = ["vk", "yandex", "mailru"];
 
 interface AuthModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  initialMode: "login" | "register";
 }
 
-const AuthModal = ({ open, onOpenChange }: AuthModalProps) => {
-  const [mode, setMode] = useState<"login" | "register">("login");
+const AuthModal = ({ open, onOpenChange, initialMode }: AuthModalProps) => {
+  const [mode, setMode] = useState<"login" | "register">(() => initialMode);
   const [loading, setLoading] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  const [socialLoadingProvider, setSocialLoadingProvider] =
+    useState<SocialAuthProvider | null>(null);
+  const [availableSocialProviders, setAvailableSocialProviders] = useState<
+    SocialAuthProvider[]
+  >([]);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setMounted(true);
-    }, 0);
+    setMode(initialMode);
+  }, [initialMode]);
 
-    return () => {
-      clearTimeout(timer);
-      setMounted(false);
+  useEffect(() => {
+    if (!open) return;
+
+    let isMounted = true;
+
+    const loadProviders = async () => {
+      const providers = await getProviders();
+
+      if (!isMounted || !providers) {
+        return;
+      }
+
+      const enabledSocialProviders = socialProviderOrder.filter(
+        (providerId) => providerId in providers,
+      );
+
+      setAvailableSocialProviders(enabledSocialProviders);
     };
-  }, []);
 
-  useEffect(() => {
-    if (open) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "unset";
-    }
+    void loadProviders();
+
     return () => {
-      document.body.style.overflow = "unset";
+      isMounted = false;
     };
   }, [open]);
 
@@ -65,392 +119,270 @@ const AuthModal = ({ open, onOpenChange }: AuthModalProps) => {
     }
   };
 
-  const handleOverlayClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      onOpenChange(false);
+  const router = useRouter();
+
+  const handleSocialAuth = async (provider: SocialAuthProvider) => {
+    try {
+      setSocialLoadingProvider(provider);
+      await socialLogin(provider);
+    } catch {
+      setSocialLoadingProvider(null);
+      toast.error("Не удалось начать вход через соцсеть");
     }
   };
 
   const handleLogin = async (data: LoginData) => {
     setLoading(true);
+
     const result = await login(data);
+
     setLoading(false);
 
-    if (!result?.error) onOpenChange(false);
+    if (result?.error) {
+      toast.error("Неверный email или пароль");
+      return;
+    }
+
+    toast.success("Добро пожаловать 👋");
+
+    onOpenChange(false);
+    router.push("/dashboard");
   };
 
   const handleRegister = async (data: RegisterData) => {
     setLoading(true);
+
     const res = await register(data);
+    const result = await res.json();
+
+    if (!res.ok) {
+      toast.error(result.error || "Ошибка регистрации");
+      setLoading(false);
+      return;
+    }
+
+    const loginResult = await login({
+      email: data.email,
+      password: data.password,
+    });
+
     setLoading(false);
 
-    if (res.ok) setMode("login");
+    if (loginResult?.error) {
+      toast.error("Аккаунт создан, но не удалось войти");
+      return;
+    }
+
+    toast.success("Аккаунт создан 🎉");
+    onOpenChange(false);
+    router.push("/dashboard");
   };
 
-  if (!mounted) return null;
-
-  return createPortal(
-    <AnimatePresence>
-      {open && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.2 }}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-          onClick={handleOverlayClick}
-        >
-          <motion.div
-            initial={{ scale: 0.9, opacity: 0, y: 20 }}
-            animate={{ scale: 1, opacity: 1, y: 0 }}
-            exit={{ scale: 0.9, opacity: 0, y: 20 }}
-            transition={{
-              duration: 0.3,
-              type: "spring",
-              damping: 25,
-              stiffness: 300,
-            }}
-            className="relative w-full max-w-md bg-background rounded-lg shadow-xl overflow-hidden"
-          >
-            <motion.div
-              initial={{ scaleX: 0 }}
-              animate={{ scaleX: 1 }}
-              transition={{ delay: 0.2, duration: 0.4 }}
-              className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary to-[#ff7af0]"
+  return (
+    <Modal
+      isOpen={open}
+      onOpenChange={onOpenChange}
+      placement="center"
+      backdrop="blur"
+      hideCloseButton
+      classNames={{
+        base: "max-w-md",
+        backdrop: "bg-black/50",
+      }}
+    >
+      <ModalContent className="overflow-hidden rounded-2xl">
+        {(onClose) => (
+          <>
+            <div
+              className="h-1 w-full"
+              style={{
+                backgroundImage:
+                  "linear-gradient(to right, var(--primary), var(--primary-highlight))",
+              }}
             />
 
-            <button
-              onClick={() => onOpenChange(false)}
-              className="absolute right-4 top-4 z-10 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none"
+            <Button
+              isIconOnly
+              variant="light"
+              onPress={onClose}
+              className="absolute right-3 top-3 z-10 min-w-0 rounded-full"
+              aria-label="Закрыть модальное окно"
             >
               <X className="h-4 w-4" />
-            </button>
+            </Button>
 
-            <div className="p-6">
-              <motion.h2
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 }}
-                className="text-center text-xl font-semibold mb-6"
-              >
+            <ModalHeader className="flex flex-col items-center gap-1 px-6 pb-2 pt-6 text-center">
+              <h2 className="text-xl font-semibold">
                 {mode === "login" ? "Вход в аккаунт" : "Создать аккаунт"}
-              </motion.h2>
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                {mode === "login"
+                  ? "Войдите, чтобы продолжить работу в Taska"
+                  : "Зарегистрируйтесь, чтобы начать работу"}
+              </p>
+            </ModalHeader>
 
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.15 }}
-                className="space-y-3"
-              >
-                <button
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2 border rounded-md hover:bg-accent transition-colors disabled:opacity-50 group"
-                >
-                  <YandexLogo />
-                  <span>Войти через ЯID</span>
-                </button>
-
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t" />
-                  </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <motion.span
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      transition={{ delay: 0.3, type: "spring" }}
-                      className="bg-background px-2 text-muted-foreground"
-                    >
-                      или
-                    </motion.span>
-                  </div>
-                </div>
-              </motion.div>
-
-              <AnimatePresence mode="wait">
-                {mode === "login" && (
-                  <motion.form
-                    key="login"
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 20 }}
-                    transition={{ duration: 0.3 }}
+            <ModalBody className="px-6 pb-6 pt-2">
+              <div className="space-y-4">
+                {mode === "login" ? (
+                  <form
                     onSubmit={loginForm.handleSubmit(handleLogin)}
-                    className="space-y-4 mt-4"
+                    className="space-y-4"
                   >
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.1 }}
-                      className="space-y-2"
-                    >
-                      <label
-                        htmlFor="login-email"
-                        className="text-sm font-medium"
-                      >
-                        Email
-                      </label>
-                      <Input
-                        id="login-email"
-                        type="email"
-                        placeholder="you@example.com"
-                        {...loginForm.register("email")}
-                      />
-                      <AnimatePresence>
-                        {loginForm.formState.errors.email && (
-                          <motion.p
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: "auto" }}
-                            exit={{ opacity: 0, height: 0 }}
-                            className="text-sm text-destructive overflow-hidden"
-                          >
-                            {loginForm.formState.errors.email.message}
-                          </motion.p>
-                        )}
-                      </AnimatePresence>
-                    </motion.div>
+                    <Input
+                      id="login-email"
+                      type="email"
+                      label="Email"
+                      labelPlacement="inside"
+                      placeholder="you@example.com"
+                      variant="flat"
+                      radius="md"
+                      {...loginForm.register("email")}
+                      isInvalid={!!loginForm.formState.errors.email}
+                      errorMessage={loginForm.formState.errors.email?.message}
+                    />
 
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.15 }}
-                      className="space-y-2"
-                    >
-                      <label
-                        htmlFor="login-password"
-                        className="text-sm font-medium"
-                      >
-                        Пароль
-                      </label>
-                      <Input
-                        id="login-password"
-                        type="password"
-                        placeholder="••••••"
-                        {...loginForm.register("password")}
-                      />
-                      <AnimatePresence>
-                        {loginForm.formState.errors.password && (
-                          <motion.p
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: "auto" }}
-                            exit={{ opacity: 0, height: 0 }}
-                            className="text-sm text-destructive overflow-hidden"
-                          >
-                            {loginForm.formState.errors.password.message}
-                          </motion.p>
-                        )}
-                      </AnimatePresence>
-                    </motion.div>
+                    <Input
+                      id="login-password"
+                      type="password"
+                      label="Пароль"
+                      labelPlacement="inside"
+                      placeholder="••••••"
+                      variant="flat"
+                      radius="md"
+                      {...loginForm.register("password")}
+                      isInvalid={!!loginForm.formState.errors.password}
+                      errorMessage={loginForm.formState.errors.password?.message}
+                    />
 
-                    <motion.button
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
+                    <Button
                       type="submit"
-                      disabled={loading}
-                      className="w-full flex items-center justify-center px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50 relative overflow-hidden group"
+                      color="primary"
+                      fullWidth
+                      isLoading={loading}
+                      className="font-medium"
                     >
-                      <motion.span
-                        initial={{ x: "-100%" }}
-                        animate={{ x: "100%" }}
-                        transition={{
-                          duration: 1,
-                          repeat: Infinity,
-                          ease: "linear",
-                        }}
-                        className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
-                      />
-                      {loading && (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      )}
                       Войти
-                    </motion.button>
-                  </motion.form>
-                )}
-
-                {mode === "register" && (
-                  <motion.form
-                    key="register"
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    transition={{ duration: 0.3 }}
+                    </Button>
+                  </form>
+                ) : (
+                  <form
                     onSubmit={registerForm.handleSubmit(handleRegister)}
-                    className="space-y-4 mt-4"
+                    className="space-y-4"
                   >
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.1 }}
-                      className="space-y-2"
-                    >
-                      <label htmlFor="reg-name" className="text-sm font-medium">
-                        Имя
-                      </label>
-                      <Input
-                        id="reg-name"
-                        placeholder="Ваше имя"
-                        {...registerForm.register("name")}
-                      />
-                      <AnimatePresence>
-                        {registerForm.formState.errors.name && (
-                          <motion.p
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: "auto" }}
-                            exit={{ opacity: 0, height: 0 }}
-                            className="text-sm text-destructive overflow-hidden"
-                          >
-                            {registerForm.formState.errors.name.message}
-                          </motion.p>
-                        )}
-                      </AnimatePresence>
-                    </motion.div>
+                    <Input
+                      id="reg-name"
+                      label="Имя"
+                      labelPlacement="inside"
+                      placeholder="Ваше имя"
+                      variant="flat"
+                      radius="md"
+                      {...registerForm.register("name")}
+                      isInvalid={!!registerForm.formState.errors.name}
+                      errorMessage={registerForm.formState.errors.name?.message}
+                    />
 
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.15 }}
-                      className="space-y-2"
-                    >
-                      <label
-                        htmlFor="reg-email"
-                        className="text-sm font-medium"
-                      >
-                        Email
-                      </label>
-                      <Input
-                        id="reg-email"
-                        type="email"
-                        placeholder="you@example.com"
-                        {...registerForm.register("email")}
-                      />
-                      <AnimatePresence>
-                        {registerForm.formState.errors.email && (
-                          <motion.p
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: "auto" }}
-                            exit={{ opacity: 0, height: 0 }}
-                            className="text-sm text-destructive overflow-hidden"
-                          >
-                            {registerForm.formState.errors.email.message}
-                          </motion.p>
-                        )}
-                      </AnimatePresence>
-                    </motion.div>
+                    <Input
+                      id="reg-email"
+                      type="email"
+                      label="Email"
+                      labelPlacement="inside"
+                      placeholder="you@example.com"
+                      variant="flat"
+                      radius="md"
+                      {...registerForm.register("email")}
+                      isInvalid={!!registerForm.formState.errors.email}
+                      errorMessage={registerForm.formState.errors.email?.message}
+                    />
 
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.2 }}
-                      className="space-y-2"
-                    >
-                      <label
-                        htmlFor="reg-password"
-                        className="text-sm font-medium"
-                      >
-                        Пароль
-                      </label>
-                      <Input
-                        id="reg-password"
-                        type="password"
-                        placeholder="••••••"
-                        {...registerForm.register("password")}
-                      />
-                      <AnimatePresence>
-                        {registerForm.formState.errors.password && (
-                          <motion.p
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: "auto" }}
-                            exit={{ opacity: 0, height: 0 }}
-                            className="text-sm text-destructive overflow-hidden"
-                          >
-                            {registerForm.formState.errors.password.message}
-                          </motion.p>
-                        )}
-                      </AnimatePresence>
-                    </motion.div>
+                    <Input
+                      id="reg-password"
+                      type="password"
+                      label="Пароль"
+                      labelPlacement="inside"
+                      placeholder="••••••"
+                      variant="flat"
+                      radius="md"
+                      {...registerForm.register("password")}
+                      isInvalid={!!registerForm.formState.errors.password}
+                      errorMessage={registerForm.formState.errors.password?.message}
+                    />
 
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.25 }}
-                      className="space-y-2"
-                    >
-                      <label
-                        htmlFor="reg-confirm"
-                        className="text-sm font-medium"
-                      >
-                        Повторите пароль
-                      </label>
-                      <Input
-                        id="reg-confirm"
-                        type="password"
-                        placeholder="••••••"
-                        {...registerForm.register("confirmPassword")}
-                      />
-                      <AnimatePresence>
-                        {registerForm.formState.errors.confirmPassword && (
-                          <motion.p
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: "auto" }}
-                            exit={{ opacity: 0, height: 0 }}
-                            className="text-sm text-destructive overflow-hidden"
-                          >
-                            {
-                              registerForm.formState.errors.confirmPassword
-                                .message
-                            }
-                          </motion.p>
-                        )}
-                      </AnimatePresence>
-                    </motion.div>
+                    <Input
+                      id="reg-confirm"
+                      type="password"
+                      label="Повторите пароль"
+                      labelPlacement="inside"
+                      placeholder="••••••"
+                      variant="flat"
+                      radius="md"
+                      {...registerForm.register("confirmPassword")}
+                      isInvalid={!!registerForm.formState.errors.confirmPassword}
+                      errorMessage={
+                        registerForm.formState.errors.confirmPassword?.message
+                      }
+                    />
 
-                    <motion.button
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
+                    <Button
                       type="submit"
-                      disabled={loading}
-                      className="w-full flex items-center justify-center px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50 relative overflow-hidden group"
+                      color="primary"
+                      fullWidth
+                      isLoading={loading}
+                      className="font-medium"
                     >
-                      <motion.span
-                        initial={{ x: "-100%" }}
-                        animate={{ x: "100%" }}
-                        transition={{
-                          duration: 1,
-                          repeat: Infinity,
-                          ease: "linear",
-                        }}
-                        className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
-                      />
-                      {loading && (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      )}
                       Создать аккаунт
-                    </motion.button>
-                  </motion.form>
+                    </Button>
+                  </form>
                 )}
-              </AnimatePresence>
 
-              <motion.p
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.3 }}
-                className="text-center text-sm text-muted-foreground mt-4"
-              >
-                {mode === "login" ? "Нет аккаунта?" : "Уже есть аккаунт?"}{" "}
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={switchMode}
-                  className="text-primary hover:underline font-medium"
-                >
-                  {mode === "login" ? "Зарегистрироваться" : "Войти"}
-                </motion.button>
-              </motion.p>
-            </div>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>,
-    document.body,
+                {availableSocialProviders.length > 0 && (
+                  <>
+                    <div className="relative">
+                      <div className="absolute inset-0 flex items-center">
+                        <span className="w-full border-t border-divider" />
+                      </div>
+                      <div className="relative flex justify-center text-xs uppercase">
+                        <span className="bg-content1 px-2 text-muted-foreground">
+                          или
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      {availableSocialProviders.map((provider) => (
+                        <Button
+                          key={provider}
+                          fullWidth
+                          variant="light"
+                          className="justify-start font-medium"
+                          startContent={socialProviderMeta[provider].icon}
+                          isLoading={socialLoadingProvider === provider}
+                          isDisabled={loading || socialLoadingProvider !== null}
+                          onPress={() => handleSocialAuth(provider)}
+                        >
+                          {socialProviderMeta[provider].label}
+                        </Button>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                <p className="text-center text-sm text-muted-foreground">
+                  {mode === "login" ? "Нет аккаунта?" : "Уже есть аккаунт?"}{" "}
+                  <button
+                    type="button"
+                    onClick={switchMode}
+                    className="h-auto min-w-0 px-1 align-baseline font-medium text-primary cursor-pointer"
+                  >
+                    {mode === "login" ? "Зарегистрироваться" : "Войти"}
+                  </button>
+                </p>
+              </div>
+            </ModalBody>
+          </>
+        )}
+      </ModalContent>
+    </Modal>
   );
 };
 

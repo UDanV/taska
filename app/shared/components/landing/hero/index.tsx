@@ -1,6 +1,13 @@
 import { motion } from "motion/react";
+import { Button } from "@heroui/button";
+import { Chip } from "@heroui/chip";
+import Link from "next/link";
+import { useSession } from "next-auth/react";
 
 export const Hero = () => {
+
+  const { data: session } = useSession();
+
   return (
     <section className="relative min-h-screen flex items-center pt-16 overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-br from-background via-background/95 to-background">
@@ -48,9 +55,13 @@ export const Hero = () => {
               initial={{ opacity: 0, y: -30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.2 }}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-accent text-accent-foreground text-xs font-semibold mb-4 border border-border/50 backdrop-blur-sm"
             >
-              <span>Без ограничений. Бесплатно. Навсегда</span>
+              <Chip
+                variant="shadow"
+                className="bg-accent py-1.5 text-accent-foreground text-xs font-semibold mb-4 h-full"
+              >
+                Без ограничений. Бесплатно. Навсегда
+              </Chip>
             </motion.div>
 
             <h1 className="text-4xl text-center md:text-5xl lg:text-6xl font-extrabold leading-tight mb-6">
@@ -61,11 +72,25 @@ export const Hero = () => {
               Минималистичный таск-менеджер для фокуса, продуктивности и
               командной работы
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
-              <button className="inline-flex items-center justify-center px-8 py-3.5 rounded-2xl bg-primary text-primary-foreground font-semibold text-base hover:opacity-90 transition-all hover:scale-105 shadow-lg hover:shadow-primary/25">
-                Попробовать бесплатно
-              </button>
-            </div>
+            {
+              session?.user ? (
+                <Button
+                  as={Link}
+                  href="/dashboard"
+                  className="rounded-xl bg-primary text-primary-foreground font-semibold text-base hover:opacity-90 transition-all hover:scale-105 shadow-lg"
+                >
+                  Перейти в приложение
+                </Button>
+              ) : (
+                <Button
+                  as={Link}
+                  href="#cta"
+                  className="rounded-xl bg-primary text-primary-foreground font-semibold text-base hover:opacity-90 transition-all hover:scale-105 shadow-lg"
+                >
+                  Попробовать бесплатно
+                </Button>
+              )
+            }
           </motion.div>
         </div>
       </div>

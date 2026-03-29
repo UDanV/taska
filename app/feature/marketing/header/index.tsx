@@ -1,18 +1,28 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Menu, X, Moon, Sun, ArrowRight } from "lucide-react";
+import {
+  Menu,
+  X,
+  Moon,
+  Sun,
+  ArrowRight,
+} from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { LogoIcon } from "@/app/shared/components/icons/common";
 import { useTheme } from "@/app/shared/hooks/useTheme";
 import AuthModal from "@/app/shared/components/modal/auth";
+import { Divider, Spinner } from '@heroui/react';
+import { signOut, useSession } from "next-auth/react";
+import { Button } from "@heroui/button";
+import { CustomDropdown } from "@/app/shared/components/dropdown";
 
 const Header = () => {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const { theme, toggleTheme } = useTheme();
+  const { theme, toggleTheme, mounted } = useTheme();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -21,12 +31,16 @@ const Header = () => {
   }, []);
 
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authModalMode, setAuthModalMode] = useState<"login" | "register">(
+    "register",
+  );
+
+  const { data: session } = useSession();
 
   const links = [
     { label: "Возможности", href: "#features" },
     { label: "Как это работает", href: "#how" },
     { label: "Отзывы", href: "#testimonials" },
-    { label: "Тарифы", href: "#pricing" },
   ];
 
   const headerVariants = {
@@ -37,11 +51,10 @@ const Header = () => {
   return (
     <motion.header
       variants={headerVariants}
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        scrolled
-          ? "bg-background/80 backdrop-blur-xl border-b border-border shadow-sm"
-          : "md:bg-transparent bg-background "
-      }`}
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled
+        ? "bg-background/80 backdrop-blur-xl border-b border-border shadow-sm"
+        : "md:bg-transparent bg-background "
+        }`}
     >
       <div className="container mx-auto flex md:flex lg:grid lg:grid-cols-3 items-center justify-between h-16 px-4 md:px-6">
         <Link href="#" className="text-xl font-bold tracking-tight">
@@ -61,23 +74,51 @@ const Header = () => {
         </nav>
 
         <div className="flex items-center gap-3 justify-end">
-          <button
-            onClick={toggleTheme}
-            className="p-2 rounded-lg hover:bg-muted transition-colors"
-            aria-label="Toggle theme"
+          <Button
+            onPress={toggleTheme}
+            variant="light"
+            className="min-w-0 rounded-xl p-2"
+            aria-label="Переключить тему"
           >
-            {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
-          </button>
-          <button
-            className="hidden md:inline-flex items-center px-5 py-2 gap-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity"
-            onClick={() => setIsAuthModalOpen(true)}
-          >
-            Регистрация
-            <ArrowRight size={15} />
-          </button>
-          <button className="hidden md:inline-flex items-center px-5 py-2 rounded-xl bg-background text-primary-background border text-sm font-semibold hover:opacity-90 transition-opacity">
-            Вход
-          </button>
+            <span className="inline-flex h-[18px] w-[18px] items-center justify-center">
+              {mounted ? (
+                theme === "dark" ? (
+                  <Sun size={18} />
+                ) : (
+                  <Moon size={18} />
+                )
+              ) : (
+                <span className="h-[18px] w-[18px]" aria-hidden="true" />
+              )}
+            </span>
+          </Button>
+          <Divider orientation="vertical" className="h-4" />
+          {session?.user ? (
+            <CustomDropdown />
+          ) : (
+            <>
+              <Button
+                className="hidden md:inline-flex items-center px-5 py-2 gap-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity"
+                onPress={() => {
+                  setAuthModalMode("register");
+                  setIsAuthModalOpen(true);
+                }}
+              >
+                Регистрация
+                <ArrowRight size={15} />
+              </Button>
+              <Button
+                className="hidden md:inline-flex items-center px-5 py-2 rounded-xl bg-background text-primary-background border text-sm font-semibold hover:opacity-90 transition-opacity"
+                onPress={() => {
+                  setAuthModalMode("login");
+                  setIsAuthModalOpen(true);
+                }}
+              >
+                Вход
+              </Button>
+            </>
+          )}
+
           <button
             className="md:hidden p-2"
             onClick={() => setMobileOpen(!mobileOpen)}
@@ -108,13 +149,21 @@ const Header = () => {
                 </a>
               ))}
               <button
-                onClick={() => setMobileOpen(false)}
+                onClick={() => {
+                  setAuthModalMode("login");
+                  setIsAuthModalOpen(true);
+                  setMobileOpen(false);
+                }}
                 className="mt-2 text-center py-3 px-4 rounded-xl bg-primary text-primary-foreground text-sm font-semibold"
               >
                 Регистрация
               </button>
               <button
-                onClick={() => setMobileOpen(false)}
+                onClick={() => {
+                  setAuthModalMode("register");
+                  setIsAuthModalOpen(true);
+                  setMobileOpen(false);
+                }}
                 className="mt-2 text-center py-3 px-4 rounded-xl bg-primary text-primary-foreground text-sm font-semibold"
               >
                 Вход
@@ -127,6 +176,7 @@ const Header = () => {
       <AuthModal
         open={isAuthModalOpen}
         onOpenChange={setIsAuthModalOpen}
+        initialMode={authModalMode}
       />
     </motion.header>
   );
