@@ -13,8 +13,8 @@ import Link from "next/link";
 import { LogoIcon } from "@/app/shared/components/icons/common";
 import { useTheme } from "@/app/shared/hooks/useTheme";
 import AuthModal from "@/app/shared/components/modal/auth";
-import { Divider, Spinner } from '@heroui/react';
-import { signOut, useSession } from "next-auth/react";
+import { Divider } from '@heroui/react';
+import { useSession } from "next-auth/react";
 import { Button } from "@heroui/button";
 import { CustomDropdown } from "@/app/shared/components/dropdown";
 

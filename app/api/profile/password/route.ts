@@ -1,15 +1,14 @@
 import bcrypt from "bcrypt";
-import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
-import { authOptions } from "@/app/lib/auth/options";
+import { getCurrentUser } from "@/app/lib/auth/session";
 import { prisma } from "@/app/lib/prisma";
 import { changePasswordSchema } from "@/app/lib/validation/auth.schema";
 
 export async function POST(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
+    const currentUser = await getCurrentUser();
 
-    if (!session?.user?.id) {
+    if (!currentUser?.id) {
       return NextResponse.json({ error: "Необходима авторизация" }, { status: 401 });
     }
 
@@ -17,7 +16,7 @@ export async function POST(req: Request) {
     const data = changePasswordSchema.parse(body);
 
     const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
+      where: { id: currentUser.id },
       select: { password: true },
     });
 
@@ -50,7 +49,7 @@ export async function POST(req: Request) {
     const hashedPassword = await bcrypt.hash(data.newPassword, 10);
 
     await prisma.user.update({
-      where: { id: session.user.id },
+      where: { id: currentUser.id },
       data: { password: hashedPassword },
     });
 

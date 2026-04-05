@@ -1,0 +1,67 @@
+CREATE TYPE "TeamMemberRole" AS ENUM ('OWNER', 'MEMBER');
+
+CREATE TYPE "TaskStatus" AS ENUM ('TODO', 'IN_PROGRESS', 'REVIEW', 'DONE');
+
+CREATE TYPE "TaskPriority" AS ENUM ('LOW', 'MEDIUM', 'HIGH');
+
+CREATE TABLE "Team" (
+  "id" TEXT NOT NULL,
+  "name" TEXT NOT NULL,
+  "color" TEXT NOT NULL DEFAULT '#6366F1',
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "createdById" TEXT NOT NULL,
+
+  CONSTRAINT "Team_pkey" PRIMARY KEY ("id")
+);
+
+CREATE TABLE "TeamMember" (
+  "id" TEXT NOT NULL,
+  "role" "TeamMemberRole" NOT NULL DEFAULT 'MEMBER',
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "teamId" TEXT NOT NULL,
+  "userId" TEXT NOT NULL,
+
+  CONSTRAINT "TeamMember_pkey" PRIMARY KEY ("id")
+);
+
+CREATE TABLE "Task" (
+  "id" TEXT NOT NULL,
+  "title" TEXT NOT NULL,
+  "description" TEXT,
+  "status" "TaskStatus" NOT NULL DEFAULT 'TODO',
+  "priority" "TaskPriority" NOT NULL DEFAULT 'MEDIUM',
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "teamId" TEXT NOT NULL,
+  "createdById" TEXT NOT NULL,
+  "assigneeId" TEXT,
+
+  CONSTRAINT "Task_pkey" PRIMARY KEY ("id")
+);
+
+CREATE UNIQUE INDEX "TeamMember_teamId_userId_key" ON "TeamMember"("teamId", "userId");
+
+ALTER TABLE "Team"
+  ADD CONSTRAINT "Team_createdById_fkey"
+  FOREIGN KEY ("createdById") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+ALTER TABLE "TeamMember"
+  ADD CONSTRAINT "TeamMember_teamId_fkey"
+  FOREIGN KEY ("teamId") REFERENCES "Team"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+ALTER TABLE "TeamMember"
+  ADD CONSTRAINT "TeamMember_userId_fkey"
+  FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+ALTER TABLE "Task"
+  ADD CONSTRAINT "Task_teamId_fkey"
+  FOREIGN KEY ("teamId") REFERENCES "Team"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+ALTER TABLE "Task"
+  ADD CONSTRAINT "Task_createdById_fkey"
+  FOREIGN KEY ("createdById") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+ALTER TABLE "Task"
+  ADD CONSTRAINT "Task_assigneeId_fkey"
+  FOREIGN KEY ("assigneeId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;

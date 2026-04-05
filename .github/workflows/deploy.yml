@@ -1,0 +1,42 @@
+name: Deploy
+
+on:
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to Debian VPS
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          script: |
+            set -e
+
+            cd /var/www/taska
+            git pull --ff-only origin main
+            bun install --frozen-lockfile
+            bunx prisma migrate deploy
+            bunx prisma generate
+            bun run build
+            pm2 startOrReload ecosystem.config.cjs --env production
+
+            pm2 save

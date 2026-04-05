@@ -1,18 +1,13 @@
 import { redirect } from "next/navigation";
-import { getServerSession } from "next-auth";
 import ProfileContent from "@/app/feature/profile/content";
-import { authOptions } from "@/app/lib/auth/options";
+import { requireAuthenticatedUser } from "@/app/lib/auth/guards";
 import { prisma } from "@/app/lib/prisma";
 
 export default async function DashboardProfilePage() {
-  const session = await getServerSession(authOptions);
-
-  if (!session?.user?.id) {
-    redirect("/");
-  }
+  const currentUser = await requireAuthenticatedUser();
 
   const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
+    where: { id: currentUser.id },
     select: {
       name: true,
       email: true,
@@ -32,6 +27,7 @@ export default async function DashboardProfilePage() {
         email: user.email,
         image: user.image,
         hasPassword: Boolean(user.password),
+        role: currentUser.role,
       }}
     />
   );

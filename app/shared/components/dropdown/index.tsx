@@ -1,11 +1,13 @@
 import { Avatar } from "@heroui/avatar";
 import { Dropdown, DropdownItem, DropdownMenu, DropdownTrigger } from "@heroui/dropdown";
-import { LogOut, Settings, UserRound } from "lucide-react";
+import { LogOut, Settings } from "lucide-react";
 import Link from "next/link";
 import { signOut, useSession } from "next-auth/react";
+import { ROLE_LABELS } from "@/app/lib/auth/roles";
 
 export const CustomDropdown = () => {
     const { data: session } = useSession();
+    const roleLabel = session?.user?.role ? ROLE_LABELS[session.user.role] : null;
 
     return (
         <Dropdown placement="bottom-end">
@@ -31,6 +33,11 @@ export const CustomDropdown = () => {
                         <span className="text-xs text-muted-foreground">
                             {session?.user?.email || "Рабочее пространство Taska"}
                         </span>
+                        {roleLabel ? (
+                            <span className="text-xs text-primary">
+                                {roleLabel}
+                            </span>
+                        ) : null}
                     </div>
                 </DropdownItem>
                 <DropdownItem

@@ -5,6 +5,8 @@ import { Avatar, Button, Chip, Input } from "@heroui/react";
 import { BadgeCheck, KeyRound, ShieldCheck, UserRound } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
+import type { AppRole } from "@/app/lib/auth/roles";
+import { ROLE_DESCRIPTIONS, ROLE_LABELS } from "@/app/lib/auth/roles";
 import {
   changePasswordSchema,
   type ChangePasswordData,
@@ -17,10 +19,9 @@ type ProfileContentProps = {
     email: string | null;
     image: string | null;
     hasPassword: boolean;
+    role: AppRole;
   };
 };
-
-const roleLabel = "Работник";
 
 export default function ProfileContent({ user }: ProfileContentProps) {
   const form = useForm<ChangePasswordData>({
@@ -31,6 +32,8 @@ export default function ProfileContent({ user }: ProfileContentProps) {
       confirmPassword: "",
     },
   });
+  const roleLabel = ROLE_LABELS[user.role];
+  const roleDescription = ROLE_DESCRIPTIONS[user.role];
 
   const handleChangePassword = async (data: ChangePasswordData) => {
     const response = await changePassword(data);
@@ -53,8 +56,8 @@ export default function ProfileContent({ user }: ProfileContentProps) {
           Аккаунт и безопасность
         </h1>
         <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
-          Здесь собрана базовая информация о пользователе, текущая роль для
-          будущего разграничения прав и настройки безопасности аккаунта.
+          Здесь собрана базовая информация о пользователе, его реальная роль в
+          системе и настройки безопасности аккаунта.
         </p>
       </section>
 
@@ -109,9 +112,7 @@ export default function ProfileContent({ user }: ProfileContentProps) {
             <div className="mt-5 rounded-3xl bg-muted p-4">
               <p className="font-medium">{roleLabel}</p>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                Пока это подготовительный статус для будущего разграничения прав
-                между администратором, менеджером и работником. Позже сюда можно
-                будет подключить реальную роль из базы данных.
+                {roleDescription}
               </p>
             </div>
           </section>

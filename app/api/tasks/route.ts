@@ -1,0 +1,173 @@
+import { NextResponse } from "next/server";
+import { ZodError } from "zod";
+import { hasCapability } from "@/app/lib/auth/roles";
+import { getCurrentUser } from "@/app/lib/auth/session";
+import { prisma } from "@/app/lib/prisma";
+import { createTaskSchema } from "@/app/lib/validation/workspace.schema";
+
+function getTaskScope(userId: string, role: string) {
+  if (role === "ROOT") {
+    return {};
+  }
+
+  return {
+    OR: [
+      {
+        team: {
+          members: {
+            some: {
+              userId,
+            },
+          },
+        },
+      },
+      {
+        createdById: userId,
+      },
+      {
+        assigneeId: userId,
+      },
+    ],
+  };
+}
+
+export async function GET() {
+  const user = await getCurrentUser();
+
+  if (!user?.id) {
+    return NextResponse.json({ error: "Требуется авторизация" }, { status: 401 });
+  }
+
+  const tasks = await prisma.task.findMany({
+    where: getTaskScope(user.id, user.role),
+    orderBy: [{ status: "asc" }, { updatedAt: "desc" }],
+    select: {
+      id: true,
+      title: true,
+      description: true,
+      status: true,
+      priority: true,
+      updatedAt: true,
+      team: {
+        select: {
+          id: true,
+          name: true,
+          color: true,
+        },
+      },
+      createdBy: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+      assignee: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+    },
+  });
+
+  return NextResponse.json({ tasks });
+}
+
+export async function POST(req: Request) {
+  const user = await getCurrentUser();
+
+  if (!user?.id) {
+    return NextResponse.json({ error: "Требуется авторизация" }, { status: 401 });
+  }
+
+  if (!hasCapability(user.role, "canManageTasks")) {
+    return NextResponse.json(
+      { error: "Недостаточно прав для создания задач" },
+      { status: 403 },
+    );
+  }
+
+  try {
+    const body = await req.json();
+    const data = createTaskSchema.parse(body);
+
+    const team = await prisma.team.findFirst({
+      where:
+        user.role === "ROOT"
+          ? {
+              id: data.teamId,
+            }
+          : {
+              id: data.teamId,
+              members: {
+                some: {
+                  userId: user.id,
+                },
+              },
+            },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!team) {
+      return NextResponse.json(
+        { error: "Команда не найдена или недоступна" },
+        { status: 404 },
+      );
+    }
+
+    const task = await prisma.task.create({
+      data: {
+        title: data.title,
+        description: data.description,
+        status: data.status,
+        priority: data.priority,
+        teamId: data.teamId,
+        createdById: user.id,
+        assigneeId: data.assigneeId,
+      },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        status: true,
+        priority: true,
+        updatedAt: true,
+        team: {
+          select: {
+            id: true,
+            name: true,
+            color: true,
+          },
+        },
+        createdBy: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        assignee: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    return NextResponse.json({ task }, { status: 201 });
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return NextResponse.json(
+        { error: error.issues[0]?.message ?? "Неверные данные задачи" },
+        { status: 400 },
+      );
+    }
+
+    return NextResponse.json(
+      { error: "Не удалось создать задачу" },
+      { status: 400 },
+    );
+  }
+}

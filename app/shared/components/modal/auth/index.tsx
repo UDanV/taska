@@ -335,36 +335,40 @@ const AuthModal = ({ open, onOpenChange, initialMode }: AuthModalProps) => {
                   </form>
                 )}
 
-                {availableSocialProviders.length > 0 && (
-                  <>
-                    <div className="relative">
-                      <div className="absolute inset-0 flex items-center">
-                        <span className="w-full border-t border-divider" />
-                      </div>
-                      <div className="relative flex justify-center text-xs uppercase">
-                        <span className="bg-content1 px-2 text-muted-foreground">
-                          или
-                        </span>
-                      </div>
-                    </div>
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t border-divider" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-content1 px-2 text-muted-foreground">
+                      или
+                    </span>
+                  </div>
+                </div>
 
-                    <div className="space-y-2">
-                      {availableSocialProviders.map((provider) => (
-                        <Button
-                          key={provider}
-                          fullWidth
-                          variant="light"
-                          className="justify-start font-medium"
-                          startContent={socialProviderMeta[provider].icon}
-                          isLoading={socialLoadingProvider === provider}
-                          isDisabled={loading || socialLoadingProvider !== null}
-                          onPress={() => handleSocialAuth(provider)}
-                        >
-                          {socialProviderMeta[provider].label}
-                        </Button>
-                      ))}
-                    </div>
-                  </>
+                {availableSocialProviders.length > 0 ? (
+                  <div className="space-y-2">
+                    {availableSocialProviders.map((provider) => (
+                      <Button
+                        key={provider}
+                        fullWidth
+                        variant="light"
+                        className="justify-start font-medium"
+                        startContent={socialProviderMeta[provider].icon}
+                        isLoading={socialLoadingProvider === provider}
+                        isDisabled={loading || socialLoadingProvider !== null}
+                        onPress={() => handleSocialAuth(provider)}
+                      >
+                        {socialProviderMeta[provider].label}
+                      </Button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-dashed border-divider px-4 py-3 text-sm text-muted-foreground">
+                    Сейчас доступен вход по email и паролю. Кнопки VK, Яндекс и
+                    Mail.ru появятся автоматически после настройки OAuth-ключей
+                    на сервере.
+                  </div>
                 )}
 
                 <p className="text-center text-sm text-muted-foreground">

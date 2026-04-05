@@ -1,278 +1,623 @@
 "use client";
 
 import Link from "next/link";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ArrowUpRight,
   Calendar,
   ChartBar,
   ChartPie,
   CheckCircle2,
-  Clock3,
   Flag,
+  LoaderCircle,
+  PenSquare,
   Plus,
   SlidersHorizontal,
   Table,
+  Trash2,
+  Users,
 } from "lucide-react";
 import { Button } from "@heroui/button";
-import { Chip } from "@heroui/chip";
+import { Chip, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Textarea } from "@heroui/react";
+import { toast } from "sonner";
 import { useDashboardPreferences } from "@/app/shared/providers/dashboard-preferences";
+import {
+  TASK_PRIORITIES,
+  TASK_PRIORITY_COLORS,
+  TASK_PRIORITY_LABELS,
+  TASK_STATUSES,
+  TASK_STATUS_LABELS,
+  TEAM_COLOR_OPTIONS,
+  type TaskPriority,
+  type TaskStatus,
+} from "@/app/lib/workspace/constants";
 
-const boardColumns = [
-  {
-    title: "Сегодня",
-    count: 4,
-    tasks: [
-      {
-        title: "Подготовить онбординг для новых пользователей",
-        description: "Финализировать welcome flow и блок с частыми вопросами.",
-        priority: "High",
-        priorityColor: "danger" as const,
-      },
-      {
-        title: "Созвон с дизайнером по мобильному приложению",
-        description: "Согласовать упрощенный nav и карточку задачи.",
-        priority: "Medium",
-        priorityColor: "secondary" as const,
-      },
-    ],
-  },
-  {
-    title: "В работе",
-    count: 3,
-    tasks: [
-      {
-        title: "Перенести авторизацию на production-конфиг",
-        description: "Проверить cookies, callbacks и logout flow.",
-        priority: "High",
-        priorityColor: "danger" as const,
-      },
-      {
-        title: "Собрать вид dashboard для команды",
-        description: "Добавить метрики, доску задач и рабочий sidebar.",
-        priority: "Low",
-        priorityColor: "success" as const,
-      },
-    ],
-  },
-  {
-    title: "На проверке",
-    count: 2,
-    tasks: [
-      {
-        title: "Обновить лендинг под новую офферную модель",
-        description: "Поменять CTA и блок с преимуществами.",
-        priority: "Medium",
-        priorityColor: "secondary" as const,
-      },
-      {
-        title: "Почистить dark theme после гидрации",
-        description: "Проверить переключение темы на ключевых страницах.",
-        priority: "Low",
-        priorityColor: "success" as const,
-      },
-    ],
-  },
-];
+type TeamColor = (typeof TEAM_COLOR_OPTIONS)[number];
 
-const focusTasks = [
-  {
-    title: "Сделать board view для личных задач",
-    time: "09:30 - 11:00",
-    status: "В фокусе",
-  },
-  {
-    title: "Согласовать приоритеты спринта",
-    time: "12:00 - 13:00",
-    status: "Встреча",
-  },
-  {
-    title: "Разобрать входящие идеи из inbox",
-    time: "16:00 - 17:00",
-    status: "Планирование",
-  },
-];
+type TeamItem = {
+  id: string;
+  name: string;
+  color: string;
+  membersCount: number;
+  tasksCount: number;
+};
 
-const projects = [
-  { name: "Taska Web", progress: 78, tasks: 18 },
-  { name: "Mobile MVP", progress: 46, tasks: 9 },
-  { name: "Growth Experiments", progress: 63, tasks: 14 },
-];
+type TaskItem = {
+  id: string;
+  title: string;
+  description: string | null;
+  status: TaskStatus;
+  priority: TaskPriority;
+  updatedAt: string;
+  team: {
+    id: string;
+    name: string;
+    color: string;
+  };
+  createdBy: {
+    id: string;
+    name: string | null;
+  };
+  assignee: {
+    id: string;
+    name: string | null;
+  } | null;
+};
+
+const selectClassName =
+  "h-11 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none transition focus:border-primary";
+
+function getEmptyTaskForm(teamId?: string) {
+  return {
+    title: "",
+    description: "",
+    status: "TODO" as TaskStatus,
+    priority: "MEDIUM" as TaskPriority,
+    teamId: teamId ?? "",
+  };
+}
+
+function formatUpdatedAt(value: string) {
+  return new Intl.DateTimeFormat("ru-RU", {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
 
 export default function DashboardPage() {
   const { visibleSections } = useDashboardPreferences();
   const hasVisibleSections = Object.values(visibleSections).some(Boolean);
 
-  return (
-    <div className="space-y-8 p-4 md:p-6 xl:p-8">
-      {!hasVisibleSections ? (
-        <section className="rounded-[28px] border border-dashed border-border bg-card p-10 text-center shadow-sm">
-          <div className="mx-auto max-w-xl">
-            <div className="mx-auto inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-              <SlidersHorizontal size={22} />
-            </div>
-            <h1 className="mt-5 text-2xl font-semibold">
-              Все блоки dashboard скрыты
-            </h1>
-            <p className="mt-3 text-sm leading-6 text-muted-foreground">
-              Включи нужные секции заново на странице настроек, чтобы собрать
-              рабочее пространство под свой формат работы.
-            </p>
-            <Button
-              as={Link}
-              href="/dashboard/settings"
-              color="primary"
-              className="mt-6 rounded-xl"
-            >
-              Открыть настройки
-            </Button>
-          </div>
-        </section>
-      ) : null}
+  const [teams, setTeams] = useState<TeamItem[]>([]);
+  const [tasks, setTasks] = useState<TaskItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-      {(visibleSections.overview || visibleSections.focus) && (
-        <section className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-          {visibleSections.overview ? (
-            <div className="rounded-[28px] border border-border bg-card p-6 shadow-sm">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                <div className="flex items-center gap-2">
-                  <ChartBar size={18} className="text-primary" />
-                  <h2 className="font-semibold text-lg tracking-tight">
-                    Дашборд
-                  </h2>
-                </div>
-              </div>
+  const [isCreateTeamOpen, setIsCreateTeamOpen] = useState(false);
+  const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<TaskItem | null>(null);
 
-              <div className="mt-6 grid gap-3 md:grid-cols-3">
-                <div className="rounded-3xl bg-muted p-4">
-                  <p className="text-sm text-muted-foreground">Активных задач</p>
-                  <p className="mt-2 text-3xl font-semibold">14</p>
-                  <p className="mt-2 text-sm text-emerald-500">+4 за эту неделю</p>
-                </div>
-                <div className="rounded-3xl bg-muted p-4">
-                  <p className="text-sm text-muted-foreground">В дедлайне сегодня</p>
-                  <p className="mt-2 text-3xl font-semibold">3</p>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    Самое важное в первой половине дня
-                  </p>
-                </div>
-                <div className="rounded-3xl bg-muted p-4">
-                  <p className="text-sm text-muted-foreground">Прогресс недели</p>
-                  <p className="mt-2 text-3xl font-semibold">81%</p>
-                  <p className="mt-2 text-sm text-primary">
-                    Лучший темп за последние 30 дней
-                  </p>
-                </div>
-              </div>
-            </div>
-          ) : null}
+  const [teamForm, setTeamForm] = useState<{ name: string; color: TeamColor }>({
+    name: "",
+    color: TEAM_COLOR_OPTIONS[0],
+  });
+  const [taskForm, setTaskForm] = useState(getEmptyTaskForm());
+  const [savingTeam, setSavingTeam] = useState(false);
+  const [savingTask, setSavingTask] = useState(false);
+  const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null);
 
-          {visibleSections.focus ? (
-            <div className="rounded-[28px] border border-border bg-card p-6 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Calendar size={18} className="text-primary" />
-                  <h2 className="font-semibold text-lg tracking-tight">План на сегодня</h2>
-                </div>
-              </div>
+  const loadWorkspace = useCallback(async () => {
+    setLoading(true);
+    setError(null);
 
-              <div className="mt-5 space-y-3">
-                {focusTasks.map((task) => (
-                  <div key={task.title} className="rounded-3xl bg-muted p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="font-medium">{task.title}</p>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                          {task.time}
-                        </p>
-                      </div>
-                      <Chip
-                        variant="flat"
-                        color="secondary"
-                        className="rounded-xl"
-                      >
-                        {task.status}
-                      </Chip>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : null}
-        </section>
-      )
+    try {
+      const [teamsRes, tasksRes] = await Promise.all([
+        fetch("/api/teams", { cache: "no-store" }),
+        fetch("/api/tasks", { cache: "no-store" }),
+      ]);
+
+      const teamsData = await teamsRes.json();
+      const tasksData = await tasksRes.json();
+
+      if (!teamsRes.ok) {
+        throw new Error(teamsData.error || "Не удалось загрузить команды");
       }
 
-      {
-        (visibleSections.board ||
+      if (!tasksRes.ok) {
+        throw new Error(tasksData.error || "Не удалось загрузить задачи");
+      }
+
+      setTeams(teamsData.teams ?? []);
+      setTasks(tasksData.tasks ?? []);
+    } catch (loadError) {
+      setError(
+        loadError instanceof Error
+          ? loadError.message
+          : "Не удалось загрузить рабочее пространство",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadWorkspace();
+  }, [loadWorkspace]);
+
+  useEffect(() => {
+    const openTeamModal = () => {
+      setTeamForm({ name: "", color: TEAM_COLOR_OPTIONS[0] });
+      setIsCreateTeamOpen(true);
+    };
+
+    const openTaskModal = () => {
+      if (teams.length === 0) {
+        openTeamModal();
+        return;
+      }
+
+      setEditingTask(null);
+      setTaskForm(getEmptyTaskForm(teams[0]?.id));
+      setIsTaskModalOpen(true);
+    };
+
+    const refreshWorkspace = () => {
+      void loadWorkspace();
+    };
+
+    window.addEventListener("taska:create-team", openTeamModal);
+    window.addEventListener("taska:create-task", openTaskModal);
+    window.addEventListener("taska:workspace-updated", refreshWorkspace);
+
+    return () => {
+      window.removeEventListener("taska:create-team", openTeamModal);
+      window.removeEventListener("taska:create-task", openTaskModal);
+      window.removeEventListener("taska:workspace-updated", refreshWorkspace);
+    };
+  }, [loadWorkspace, teams]);
+
+  const boardColumns = useMemo(
+    () =>
+      TASK_STATUSES.map((status) => ({
+        id: status,
+        title: TASK_STATUS_LABELS[status],
+        tasks: tasks.filter((task) => task.status === status),
+      })),
+    [tasks],
+  );
+
+  const activeTasks = tasks.filter((task) => task.status !== "DONE");
+  const reviewTasksCount = tasks.filter((task) => task.status === "REVIEW").length;
+  const doneTasksCount = tasks.filter((task) => task.status === "DONE").length;
+  const highPriorityCount = tasks.filter((task) => task.priority === "HIGH").length;
+  const focusTasks = activeTasks.slice(0, 3);
+
+  const handleCreateTeam = async () => {
+    setSavingTeam(true);
+
+    try {
+      const res = await fetch("/api/teams", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(teamForm),
+      });
+
+      const result = await res.json();
+
+      if (!res.ok) {
+        throw new Error(result.error || "Не удалось создать команду");
+      }
+
+      toast.success("Команда создана");
+      setIsCreateTeamOpen(false);
+      setTeamForm({ name: "", color: TEAM_COLOR_OPTIONS[0] });
+      setTaskForm((current) => ({
+        ...current,
+        teamId: current.teamId || result.team.id,
+      }));
+      window.dispatchEvent(new Event("taska:workspace-updated"));
+    } catch (teamError) {
+      toast.error(
+        teamError instanceof Error
+          ? teamError.message
+          : "Не удалось создать команду",
+      );
+    } finally {
+      setSavingTeam(false);
+    }
+  };
+
+  const handleCreateTask = async () => {
+    setSavingTask(true);
+
+    try {
+      const endpoint = editingTask ? `/api/tasks/${editingTask.id}` : "/api/tasks";
+      const method = editingTask ? "PATCH" : "POST";
+
+      const res = await fetch(endpoint, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(taskForm),
+      });
+
+      const result = await res.json();
+
+      if (!res.ok) {
+        throw new Error(result.error || "Не удалось сохранить задачу");
+      }
+
+      toast.success(editingTask ? "Задача обновлена" : "Задача создана");
+      setIsTaskModalOpen(false);
+      setEditingTask(null);
+      setTaskForm(getEmptyTaskForm(teams[0]?.id));
+      window.dispatchEvent(new Event("taska:workspace-updated"));
+    } catch (taskError) {
+      toast.error(
+        taskError instanceof Error
+          ? taskError.message
+          : "Не удалось сохранить задачу",
+      );
+    } finally {
+      setSavingTask(false);
+    }
+  };
+
+  const handleEditTask = (task: TaskItem) => {
+    setEditingTask(task);
+    setTaskForm({
+      title: task.title,
+      description: task.description ?? "",
+      status: task.status,
+      priority: task.priority,
+      teamId: task.team.id,
+    });
+    setIsTaskModalOpen(true);
+  };
+
+  const handleDeleteTask = async (taskId: string) => {
+    const confirmed = window.confirm("Удалить эту задачу?");
+
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingTaskId(taskId);
+
+    try {
+      const res = await fetch(`/api/tasks/${taskId}`, {
+        method: "DELETE",
+      });
+
+      const result = await res.json();
+
+      if (!res.ok) {
+        throw new Error(result.error || "Не удалось удалить задачу");
+      }
+
+      toast.success("Задача удалена");
+      window.dispatchEvent(new Event("taska:workspace-updated"));
+    } catch (deleteError) {
+      toast.error(
+        deleteError instanceof Error
+          ? deleteError.message
+          : "Не удалось удалить задачу",
+      );
+    } finally {
+      setDeletingTaskId(null);
+    }
+  };
+
+  const openTaskCreateModal = () => {
+    if (teams.length === 0) {
+      setIsCreateTeamOpen(true);
+      return;
+    }
+
+    setEditingTask(null);
+    setTaskForm(getEmptyTaskForm(teams[0]?.id));
+    setIsTaskModalOpen(true);
+  };
+
+  return (
+    <>
+      <div className="space-y-8 p-4 md:p-6 xl:p-8">
+        {!hasVisibleSections ? (
+          <section className="rounded-[28px] border border-dashed border-border bg-card p-10 text-center shadow-sm">
+            <div className="mx-auto max-w-xl">
+              <div className="mx-auto inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                <SlidersHorizontal size={22} />
+              </div>
+              <h1 className="mt-5 text-2xl font-semibold">
+                Все блоки dashboard скрыты
+              </h1>
+              <p className="mt-3 text-sm leading-6 text-muted-foreground">
+                Включи нужные секции заново на странице настроек, чтобы собрать
+                рабочее пространство под свой формат работы.
+              </p>
+              <Button
+                as={Link}
+                href="/dashboard/settings"
+                color="primary"
+                className="mt-6 rounded-xl"
+              >
+                Открыть настройки
+              </Button>
+            </div>
+          </section>
+        ) : null}
+
+        {(visibleSections.overview || visibleSections.focus) && (
+          <section className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+            {visibleSections.overview ? (
+              <div className="rounded-[28px] border border-border bg-card p-6 shadow-sm">
+                <div className="flex items-center gap-2">
+                  <ChartBar size={18} className="text-primary" />
+                  <h2 className="font-semibold text-lg tracking-tight">Дашборд</h2>
+                </div>
+
+                <div className="mt-6 grid gap-3 md:grid-cols-3">
+                  <div className="rounded-3xl bg-muted p-4">
+                    <p className="text-sm text-muted-foreground">Активных задач</p>
+                    <p className="mt-2 text-3xl font-semibold">{activeTasks.length}</p>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      Всё, что ещё не переведено в готово
+                    </p>
+                  </div>
+                  <div className="rounded-3xl bg-muted p-4">
+                    <p className="text-sm text-muted-foreground">Команд в работе</p>
+                    <p className="mt-2 text-3xl font-semibold">{teams.length}</p>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      Начните с первой команды, если список пуст
+                    </p>
+                  </div>
+                  <div className="rounded-3xl bg-muted p-4">
+                    <p className="text-sm text-muted-foreground">Закрыто задач</p>
+                    <p className="mt-2 text-3xl font-semibold">{doneTasksCount}</p>
+                    <p className="mt-2 text-sm text-primary">
+                      Высокий приоритет сейчас у {highPriorityCount} задач
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            {visibleSections.focus ? (
+              <div className="rounded-[28px] border border-border bg-card p-6 shadow-sm">
+                <div className="flex items-center gap-2">
+                  <Calendar size={18} className="text-primary" />
+                  <h2 className="font-semibold text-lg tracking-tight">
+                    Фокус на сегодня
+                  </h2>
+                </div>
+
+                <div className="mt-5 space-y-3">
+                  {focusTasks.length > 0 ? (
+                    focusTasks.map((task) => (
+                      <div key={task.id} className="rounded-3xl bg-muted p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="font-medium">{task.title}</p>
+                            <p className="mt-1 text-sm text-muted-foreground">
+                              Команда: {task.team.name}
+                            </p>
+                          </div>
+                          <Chip
+                            variant="flat"
+                            color={TASK_PRIORITY_COLORS[task.priority]}
+                            className="rounded-xl"
+                          >
+                            {TASK_PRIORITY_LABELS[task.priority]}
+                          </Chip>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="rounded-3xl bg-muted p-4">
+                      <p className="font-medium">Фокус появится после создания задач</p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Добавьте первую команду и задачу, чтобы собрать рабочий
+                        день прямо на дашборде.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : null}
+          </section>
+        )}
+
+        {(visibleSections.board ||
           visibleSections.projects ||
           visibleSections.insights) && (
           <section className="grid gap-4 2xl:grid-cols-[1.6fr_0.8fr]">
             {visibleSections.board ? (
-              <div className="rounded-[28px] border border-border bg-card p-6 shadow-sm">
-                <div className="flex items-center justify-between">
+              <div
+                id="task-board"
+                className="rounded-[28px] border border-border bg-card p-6 shadow-sm"
+              >
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                   <div className="flex items-center gap-2">
                     <Table size={18} className="text-primary" />
                     <h2 className="font-semibold text-lg tracking-tight">
                       Текущие задачи команды
                     </h2>
                   </div>
-                  <Button variant="light" endContent={<ArrowUpRight size={16} />}>
-                    Полный board
-                  </Button>
+
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant="light"
+                      className="rounded-xl"
+                      startContent={<Users size={16} />}
+                      onPress={() => setIsCreateTeamOpen(true)}
+                    >
+                      Новая команда
+                    </Button>
+                    <Button
+                      color="primary"
+                      className="rounded-xl"
+                      startContent={<Plus size={16} />}
+                      onPress={openTaskCreateModal}
+                    >
+                      Новая задача
+                    </Button>
+                  </div>
                 </div>
 
-                <div className="mt-6 grid gap-4 xl:grid-cols-3">
-                  {boardColumns.map((column) => (
-                    <div key={column.title} className="rounded-[26px] bg-muted p-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h3 className="font-semibold">{column.title}</h3>
-                          <p className="text-sm text-muted-foreground">
-                            {column.count} карточки
-                          </p>
-                        </div>
-                        <Chip variant="flat" className="rounded-xl">
-                          {column.count}
-                        </Chip>
-                      </div>
-
-                      <div className="mt-4 space-y-3">
-                        {column.tasks.map((task) => (
-                          <article
-                            key={task.title}
-                            className="rounded-3xl border border-border bg-background p-4 shadow-sm"
-                          >
-                            <div className="flex items-start justify-between gap-3">
-                              <div>
-                                <p className="font-medium">{task.title}</p>
-                                <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                                  {task.description}
-                                </p>
-                              </div>
-                              <Flag
-                                size={16}
-                                className="mt-1 text-muted-foreground"
-                              />
-                            </div>
-
-                            <div className="mt-4 flex items-center justify-between">
-                              <Chip
-                                color={task.priorityColor}
-                                variant="flat"
-                                className="rounded-xl"
-                              >
-                                {task.priority}
-                              </Chip>
-                              <span className="text-xs text-muted-foreground">
-                                Обновлено 12 мин назад
-                              </span>
-                            </div>
-                          </article>
-                        ))}
-                      </div>
+                {loading ? (
+                  <div className="mt-6 rounded-[26px] border border-dashed border-border bg-muted/30 p-8 text-center">
+                    <LoaderCircle className="mx-auto animate-spin text-primary" />
+                    <p className="mt-3 text-sm text-muted-foreground">
+                      Загружаем команды и задачи...
+                    </p>
+                  </div>
+                ) : error ? (
+                  <div className="mt-6 rounded-[26px] border border-dashed border-danger/30 bg-danger/5 p-8 text-center">
+                    <p className="text-base font-medium">{error}</p>
+                    <Button
+                      variant="light"
+                      className="mt-4 rounded-xl"
+                      onPress={() => void loadWorkspace()}
+                    >
+                      Повторить загрузку
+                    </Button>
+                  </div>
+                ) : teams.length === 0 ? (
+                  <div className="mt-6 rounded-[26px] border border-dashed border-border bg-muted/30 p-8 text-center">
+                    <div className="mx-auto inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                      <Users size={22} />
                     </div>
-                  ))}
-                </div>
+                    <h3 className="mt-4 text-xl font-semibold">
+                      Пока здесь пусто
+                    </h3>
+                    <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
+                      Создайте свою первую команду, чтобы начать вести задачи,
+                      собирать board и видеть прогресс в одном месте.
+                    </p>
+                    <Button
+                      color="primary"
+                      className="mt-5 rounded-xl"
+                      startContent={<Plus size={16} />}
+                      onPress={() => setIsCreateTeamOpen(true)}
+                    >
+                      Создать первую команду
+                    </Button>
+                  </div>
+                ) : tasks.length === 0 ? (
+                  <div className="mt-6 rounded-[26px] border border-dashed border-border bg-muted/30 p-8 text-center">
+                    <div className="mx-auto inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                      <Flag size={22} />
+                    </div>
+                    <h3 className="mt-4 text-xl font-semibold">
+                      Задач пока нет
+                    </h3>
+                    <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
+                      Команда уже готова. Добавьте первую задачу и распределите ее
+                      по статусам, чтобы доска начала оживать.
+                    </p>
+                    <Button
+                      color="primary"
+                      className="mt-5 rounded-xl"
+                      startContent={<Plus size={16} />}
+                      onPress={openTaskCreateModal}
+                    >
+                      Создать первую задачу
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="mt-6 grid gap-4 xl:grid-cols-4">
+                    {boardColumns.map((column) => (
+                      <div key={column.id} className="rounded-[26px] bg-muted p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h3 className="font-semibold">{column.title}</h3>
+                            <p className="text-sm text-muted-foreground">
+                              {column.tasks.length} карточек
+                            </p>
+                          </div>
+                          <Chip variant="flat" className="rounded-xl">
+                            {column.tasks.length}
+                          </Chip>
+                        </div>
+
+                        <div className="mt-4 space-y-3">
+                          {column.tasks.length > 0 ? (
+                            column.tasks.map((task) => (
+                              <article
+                                key={task.id}
+                                className="rounded-3xl border border-border bg-background p-4 shadow-sm"
+                              >
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-2">
+                                      <span
+                                        className="h-2.5 w-2.5 shrink-0 rounded-full"
+                                        style={{ backgroundColor: task.team.color }}
+                                      />
+                                      <p className="truncate text-sm text-muted-foreground">
+                                        {task.team.name}
+                                      </p>
+                                    </div>
+                                    <p className="mt-2 font-medium">{task.title}</p>
+                                    {task.description ? (
+                                      <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                                        {task.description}
+                                      </p>
+                                    ) : null}
+                                  </div>
+
+                                  <div className="flex items-center gap-1">
+                                    <Button
+                                      isIconOnly
+                                      size="sm"
+                                      variant="light"
+                                      className="rounded-xl"
+                                      onPress={() => handleEditTask(task)}
+                                    >
+                                      <PenSquare size={16} />
+                                    </Button>
+                                    <Button
+                                      isIconOnly
+                                      size="sm"
+                                      variant="light"
+                                      color="danger"
+                                      className="rounded-xl"
+                                      isLoading={deletingTaskId === task.id}
+                                      onPress={() => void handleDeleteTask(task.id)}
+                                    >
+                                      <Trash2 size={16} />
+                                    </Button>
+                                  </div>
+                                </div>
+
+                                <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                                  <Chip
+                                    color={TASK_PRIORITY_COLORS[task.priority]}
+                                    variant="flat"
+                                    className="rounded-xl"
+                                  >
+                                    {TASK_PRIORITY_LABELS[task.priority]}
+                                  </Chip>
+                                  <span className="text-xs text-muted-foreground">
+                                    Обновлено {formatUpdatedAt(task.updatedAt)}
+                                  </span>
+                                </div>
+                              </article>
+                            ))
+                          ) : (
+                            <div className="rounded-3xl border border-dashed border-border bg-background/70 p-4 text-sm text-muted-foreground">
+                              В этой колонке пока нет задач.
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             ) : null}
 
@@ -282,31 +627,42 @@ export default function DashboardPage() {
                   <section className="rounded-[28px] border border-border bg-card p-6 shadow-sm">
                     <div className="flex items-center gap-2">
                       <CheckCircle2 size={18} className="text-primary" />
-                      <h2 className="text-lg font-semibold">Проекты</h2>
+                      <h2 className="text-lg font-semibold">Команды</h2>
                     </div>
 
                     <div className="mt-5 space-y-4">
-                      {projects.map((project) => (
-                        <div key={project.name} className="rounded-3xl bg-muted p-4">
-                          <div className="flex items-center justify-between gap-3">
-                            <div>
-                              <p className="font-medium">{project.name}</p>
-                              <p className="mt-1 text-sm text-muted-foreground">
-                                {project.tasks} задач в работе
-                              </p>
+                      {teams.length > 0 ? (
+                        teams.map((team) => (
+                          <div key={team.id} className="rounded-3xl bg-muted p-4">
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="flex items-center gap-3">
+                                <span
+                                  className="h-3 w-3 rounded-full"
+                                  style={{ backgroundColor: team.color }}
+                                />
+                                <div>
+                                  <p className="font-medium">{team.name}</p>
+                                  <p className="mt-1 text-sm text-muted-foreground">
+                                    {team.tasksCount} задач, {team.membersCount}{" "}
+                                    участников
+                                  </p>
+                                </div>
+                              </div>
+                              <span className="text-sm font-semibold">
+                                {team.tasksCount}
+                              </span>
                             </div>
-                            <span className="text-sm font-semibold">
-                              {project.progress}%
-                            </span>
                           </div>
-                          <div className="mt-3 h-2 overflow-hidden rounded-full bg-background">
-                            <div
-                              className="h-full rounded-full bg-primary"
-                              style={{ width: `${project.progress}%` }}
-                            />
-                          </div>
+                        ))
+                      ) : (
+                        <div className="rounded-3xl bg-muted p-4">
+                          <p className="font-medium">Команд пока нет</p>
+                          <p className="mt-1 text-sm text-muted-foreground">
+                            Создайте первую команду, чтобы начать распределять
+                            задачи и доступы.
+                          </p>
                         </div>
-                      ))}
+                      )}
                     </div>
                   </section>
                 ) : null}
@@ -315,26 +671,34 @@ export default function DashboardPage() {
                   <section className="rounded-[28px] border border-border bg-card p-6 shadow-sm">
                     <div className="flex items-center gap-2">
                       <ChartPie size={18} className="text-primary" />
-                      <h2 className="font-semibold text-lg tracking-tight">Быстрые инсайты</h2>
+                      <h2 className="font-semibold text-lg tracking-tight">
+                        Быстрые инсайты
+                      </h2>
                     </div>
                     <div className="mt-4 space-y-4">
                       <div className="rounded-3xl bg-muted p-4">
                         <p className="text-sm text-muted-foreground">
-                          Лучшее время фокуса
+                          На проверке сейчас
                         </p>
-                        <p className="mt-1 text-lg font-semibold">10:00 - 13:00</p>
+                        <p className="mt-1 text-lg font-semibold">
+                          {reviewTasksCount} задач
+                        </p>
                       </div>
                       <div className="rounded-3xl bg-muted p-4">
                         <p className="text-sm text-muted-foreground">
-                          Среднее закрытие
+                          Высокий приоритет
                         </p>
-                        <p className="mt-1 text-lg font-semibold">6 задач в день</p>
+                        <p className="mt-1 text-lg font-semibold">
+                          {highPriorityCount} задач
+                        </p>
                       </div>
                       <div className="rounded-3xl bg-muted p-4">
                         <p className="text-sm text-muted-foreground">
-                          Следующий дедлайн
+                          Уже закрыто
                         </p>
-                        <p className="mt-1 text-lg font-semibold">Сегодня, 18:00</p>
+                        <p className="mt-1 text-lg font-semibold">
+                          {doneTasksCount} задач
+                        </p>
                       </div>
                     </div>
                   </section>
@@ -342,8 +706,179 @@ export default function DashboardPage() {
               </div>
             )}
           </section>
-        )
-      }
-    </div >
+        )}
+      </div>
+
+      <Modal isOpen={isCreateTeamOpen} onOpenChange={setIsCreateTeamOpen}>
+        <ModalContent className="rounded-[28px]">
+          {(onClose) => (
+            <>
+              <ModalHeader>Создать команду</ModalHeader>
+              <ModalBody className="space-y-4 pb-2">
+                <Input
+                  label="Название команды"
+                  labelPlacement="outside"
+                  placeholder="Например, Product"
+                  value={teamForm.name}
+                  onValueChange={(value) =>
+                    setTeamForm((current) => ({ ...current, name: value }))
+                  }
+                />
+
+                <div>
+                  <p className="mb-2 text-sm font-medium">Цвет команды</p>
+                  <div className="flex flex-wrap gap-3">
+                    {TEAM_COLOR_OPTIONS.map((color) => (
+                      <button
+                        key={color}
+                        type="button"
+                        className={`h-10 w-10 rounded-full border-2 transition ${
+                          teamForm.color === color
+                            ? "border-foreground scale-105"
+                            : "border-transparent"
+                        }`}
+                        style={{ backgroundColor: color }}
+                        onClick={() =>
+                          setTeamForm((current) => ({ ...current, color }))
+                        }
+                        aria-label={`Выбрать цвет ${color}`}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="light" className="rounded-xl" onPress={onClose}>
+                  Отмена
+                </Button>
+                <Button
+                  color="primary"
+                  className="rounded-xl"
+                  isLoading={savingTeam}
+                  onPress={() => void handleCreateTeam()}
+                >
+                  Создать команду
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
+
+      <Modal isOpen={isTaskModalOpen} onOpenChange={setIsTaskModalOpen}>
+        <ModalContent className="rounded-[28px]">
+          {(onClose) => (
+            <>
+              <ModalHeader>
+                {editingTask ? "Редактировать задачу" : "Новая задача"}
+              </ModalHeader>
+              <ModalBody className="space-y-4 pb-2">
+                <Input
+                  label="Название"
+                  labelPlacement="outside"
+                  placeholder="Что нужно сделать?"
+                  value={taskForm.title}
+                  onValueChange={(value) =>
+                    setTaskForm((current) => ({ ...current, title: value }))
+                  }
+                />
+
+                <div>
+                  <p className="mb-2 text-sm font-medium">Описание</p>
+                  <Textarea
+                    placeholder="Коротко опишите задачу"
+                    value={taskForm.description}
+                    onValueChange={(value) =>
+                      setTaskForm((current) => ({
+                        ...current,
+                        description: value,
+                      }))
+                    }
+                  />
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div>
+                    <p className="mb-2 text-sm font-medium">Команда</p>
+                    <select
+                      className={selectClassName}
+                      value={taskForm.teamId}
+                      onChange={(event) =>
+                        setTaskForm((current) => ({
+                          ...current,
+                          teamId: event.target.value,
+                        }))
+                      }
+                    >
+                      <option value="" disabled>
+                        Выберите команду
+                      </option>
+                      {teams.map((team) => (
+                        <option key={team.id} value={team.id}>
+                          {team.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <p className="mb-2 text-sm font-medium">Статус</p>
+                    <select
+                      className={selectClassName}
+                      value={taskForm.status}
+                      onChange={(event) =>
+                        setTaskForm((current) => ({
+                          ...current,
+                          status: event.target.value as TaskStatus,
+                        }))
+                      }
+                    >
+                      {TASK_STATUSES.map((status) => (
+                        <option key={status} value={status}>
+                          {TASK_STATUS_LABELS[status]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <p className="mb-2 text-sm font-medium">Приоритет</p>
+                    <select
+                      className={selectClassName}
+                      value={taskForm.priority}
+                      onChange={(event) =>
+                        setTaskForm((current) => ({
+                          ...current,
+                          priority: event.target.value as TaskPriority,
+                        }))
+                      }
+                    >
+                      {TASK_PRIORITIES.map((priority) => (
+                        <option key={priority} value={priority}>
+                          {TASK_PRIORITY_LABELS[priority]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="light" className="rounded-xl" onPress={onClose}>
+                  Отмена
+                </Button>
+                <Button
+                  color="primary"
+                  className="rounded-xl"
+                  isLoading={savingTask}
+                  onPress={() => void handleCreateTask()}
+                >
+                  {editingTask ? "Сохранить изменения" : "Создать задачу"}
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
+    </>
   );
 }

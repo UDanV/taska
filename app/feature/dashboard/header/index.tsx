@@ -1,15 +1,25 @@
 "use client";
 
-import Link from "next/link";
 import { Search, Plus, Bell, Moon, Sun } from "lucide-react";
 import { Button } from "@heroui/button";
+import type { AppRole } from "@/app/lib/auth/roles";
 import { Input } from "@/app/shared/components/ui/input";
+import { hasCapability } from "@/app/lib/auth/roles";
 import { useTheme } from "@/app/shared/hooks/useTheme";
 import { CustomDropdown } from "@/app/shared/components/dropdown";
 import { Divider } from "@heroui/react";
 
-export default function DashboardHeader() {
+type DashboardHeaderProps = {
+  userRole: AppRole;
+};
+
+export default function DashboardHeader({ userRole }: DashboardHeaderProps) {
   const { theme, toggleTheme, mounted } = useTheme();
+  const canManageTasks = hasCapability(userRole, "canManageTasks");
+
+  const handleCreateTask = () => {
+    window.dispatchEvent(new Event("taska:create-task"));
+  };
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-xl">
@@ -26,11 +36,13 @@ export default function DashboardHeader() {
             className="h-11 border-border bg-card pl-10 rounded-xl"
           />
           <Button
-            color="primary"
+            color={canManageTasks ? "primary" : "default"}
             className="w-full max-w-40 rounded-xl"
             startContent={<Plus size={16} className="flex-shrink-0" />}
+            isDisabled={!canManageTasks}
+            onPress={handleCreateTask}
           >
-            Новая задача
+            {canManageTasks ? "Новая задача" : "Только просмотр"}
           </Button>
         </div>
 

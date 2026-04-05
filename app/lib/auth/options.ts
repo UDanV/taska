@@ -5,6 +5,7 @@ import MailRuProvider from "next-auth/providers/mailru";
 import VkProvider from "next-auth/providers/vk";
 import YandexProvider from "next-auth/providers/yandex";
 import bcrypt from "bcrypt";
+import { DEFAULT_ROLE } from "@/app/lib/auth/roles";
 import { prisma } from "@/app/lib/prisma";
 
 const oauthProviders = [
@@ -65,6 +66,7 @@ export const authOptions: NextAuthOptions = {
           id: user.id,
           email: user.email,
           name: user.name,
+          role: user.role,
         };
       },
     }),
@@ -73,12 +75,28 @@ export const authOptions: NextAuthOptions = {
 
   callbacks: {
     async jwt({ token, user }) {
-      token.id = user?.id ?? token.id ?? token.sub ?? "";
+      const userId = user?.id ?? token.id ?? token.sub ?? "";
+
+      token.id = userId;
+
+      if (!userId) {
+        token.role = user?.role ?? token.role ?? DEFAULT_ROLE;
+        return token;
+      }
+
+      const currentUser = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { role: true },
+      });
+
+      token.role = currentUser?.role ?? user?.role ?? token.role ?? DEFAULT_ROLE;
+
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
         session.user.id = (token.id || token.sub) as string;
+        session.user.role = token.role ?? DEFAULT_ROLE;
       }
       return session;
     },

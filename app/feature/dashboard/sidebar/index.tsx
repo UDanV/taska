@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
@@ -11,6 +12,8 @@ import {
   Users,
 } from "lucide-react";
 import { Button } from "@heroui/button";
+import type { AppRole } from "@/app/lib/auth/roles";
+import { hasCapability } from "@/app/lib/auth/roles";
 
 const navigation = [
   {
@@ -41,14 +44,54 @@ const navigation = [
   },
 ];
 
-const teams = [
-  { name: "Product", color: "bg-primary" },
-  { name: "Design", color: "bg-pink-500" },
-  { name: "Growth", color: "bg-emerald-500" },
-];
+type TeamItem = {
+  id: string;
+  name: string;
+  color: string;
+  tasksCount: number;
+};
 
-export default function DashboardSidebar() {
+type DashboardSidebarProps = {
+  userRole: AppRole;
+};
+
+export default function DashboardSidebar({ userRole }: DashboardSidebarProps) {
   const pathname = usePathname();
+  const canCreateTeam = hasCapability(userRole, "canCreateTeam");
+  const [teams, setTeams] = useState<TeamItem[]>([]);
+  const [loadingTeams, setLoadingTeams] = useState(true);
+
+  useEffect(() => {
+    const loadTeams = async () => {
+      setLoadingTeams(true);
+
+      try {
+        const res = await fetch("/api/teams", { cache: "no-store" });
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.error || "Не удалось загрузить команды");
+        }
+
+        setTeams(data.teams ?? []);
+      } catch {
+        setTeams([]);
+      } finally {
+        setLoadingTeams(false);
+      }
+    };
+
+    const refreshWorkspace = () => {
+      void loadTeams();
+    };
+
+    void loadTeams();
+    window.addEventListener("taska:workspace-updated", refreshWorkspace);
+
+    return () => {
+      window.removeEventListener("taska:workspace-updated", refreshWorkspace);
+    };
+  }, []);
 
   return (
     <aside className="hidden w-[280px] shrink-0 border-r border-border bg-card/50 xl:block">
@@ -82,19 +125,49 @@ export default function DashboardSidebar() {
             <Users size={16} className="text-primary" />
             <p className="text-sm font-semibold">Команды</p>
           </div>
+          <p className="mb-3 text-xs leading-5 text-muted-foreground">
+            {canCreateTeam
+              ? "У вас есть доступ к созданию и настройке команд."
+              : "Создание команд доступно только администратору root."}
+          </p>
+          {canCreateTeam ? (
+            <Button
+              variant="light"
+              className="mb-3 h-10 w-full justify-start rounded-2xl px-3"
+              startContent={<Users size={16} />}
+              onPress={() => window.dispatchEvent(new Event("taska:create-team"))}
+            >
+              Создать команду
+            </Button>
+          ) : null}
           <div className="space-y-3">
-            {teams.map((team) => (
-              <div
-                key={team.name}
-                className="flex items-center justify-between rounded-2xl bg-muted px-3 py-2.5"
-              >
-                <div className="flex items-center gap-2">
-                  <span className={`h-2.5 w-2.5 rounded-full ${team.color}`} />
-                  <span className="text-sm font-medium">{team.name}</span>
-                </div>
-                <span className="text-xs text-muted-foreground">online</span>
+            {loadingTeams ? (
+              <div className="rounded-2xl bg-muted px-3 py-3 text-sm text-muted-foreground">
+                Загружаем команды...
               </div>
-            ))}
+            ) : teams.length > 0 ? (
+              teams.map((team) => (
+                <div
+                  key={team.id}
+                  className="flex items-center justify-between rounded-2xl bg-muted px-3 py-2.5"
+                >
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span
+                      className="h-2.5 w-2.5 shrink-0 rounded-full"
+                      style={{ backgroundColor: team.color }}
+                    />
+                    <span className="truncate text-sm font-medium">{team.name}</span>
+                  </div>
+                  <span className="text-xs text-muted-foreground">
+                    {team.tasksCount} задач
+                  </span>
+                </div>
+              ))
+            ) : (
+              <div className="rounded-2xl bg-muted px-3 py-3 text-sm text-muted-foreground">
+                Пока нет ни одной команды.
+              </div>
+            )}
           </div>
         </section>
       </div>
