@@ -12,6 +12,7 @@ module.exports = {
       env: {
         NODE_ENV: "production",
         PORT: 3000,
+        NEXTAUTH_URL: process.env.NEXTAUTH_URL || "https://task-a.ru",
       },
     },
   ],
