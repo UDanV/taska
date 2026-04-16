@@ -37,6 +37,3 @@ jobs:
             bunx prisma migrate deploy
             bunx prisma generate
             bun run build
-            pm2 startOrReload ecosystem.config.cjs --env production
-
-            pm2 save

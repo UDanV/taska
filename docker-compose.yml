@@ -22,7 +22,7 @@ services:
     environment:
       DATABASE_URL: "postgresql://taska:taska@postgres:5432/taska_db"
       NEXTAUTH_SECRET: "mYn9+2qFz5X8WpQa7rBvCjL0sEiKxNwPvQa7rBvCjL0sE="
-      NEXTAUTH_URL: "http://193.233.251.66:3000"
+      NEXTAUTH_URL: "https://task-a.ru"
     ports:
       - "3000:3000"
     command: sh -c "npx prisma migrate deploy && npm start"
