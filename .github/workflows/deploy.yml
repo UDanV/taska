@@ -31,7 +31,7 @@ jobs:
           script: |
             set -e
 
-            cd /var/www/taska
+            cd ~/taska
             git pull --ff-only origin main
             bun install --frozen-lockfile
             bunx prisma migrate deploy
