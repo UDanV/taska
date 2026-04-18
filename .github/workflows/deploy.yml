@@ -21,13 +21,14 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Deploy to Debian VPS
+      - name: deploy
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.SSH_PORT }}
+          command_timeout: 30m
           script: |
             set -e
 
