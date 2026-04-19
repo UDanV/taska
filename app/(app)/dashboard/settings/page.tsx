@@ -32,27 +32,14 @@ export default function DashboardSettingsPage() {
   return (
     <div className="space-y-8 p-4 md:p-6 xl:p-8">
       <section className="rounded-[28px] border border-border bg-card p-6 shadow-sm">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <p className="text-sm text-muted-foreground">Настройки dashboard</p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-tight">
-              Настрой пространство под себя
-            </h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
-              Выбирай, какие блоки показывать на главной странице dashboard, и
-              меняй акцентный цвет интерфейса без перезагрузки приложения.
-            </p>
-          </div>
-
-          <Button
-            variant="flat"
-            className="rounded-xl"
-            startContent={<RotateCcw size={16} />}
-            onPress={resetPreferences}
-          >
-            Сбросить настройки
-          </Button>
-        </div>
+        <Button
+          variant="flat"
+          className="rounded-xl"
+          startContent={<RotateCcw size={16} />}
+          onPress={resetPreferences}
+        >
+          Сбросить настройки
+        </Button>
       </section>
 
       <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
@@ -135,11 +122,10 @@ export default function DashboardSettingsPage() {
                       type="button"
                       aria-label={`Выбрать цвет ${color}`}
                       onClick={() => setAccentColor(color)}
-                      className={`h-11 w-11 rounded-2xl border-2 transition-transform hover:scale-105 ${
-                        isActive
+                      className={`h-11 w-11 rounded-2xl border-2 transition-transform hover:scale-105 ${isActive
                           ? "border-foreground shadow-sm"
                           : "border-border"
-                      }`}
+                        }`}
                       style={{ backgroundColor: color }}
                     />
                   );

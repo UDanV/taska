@@ -5,7 +5,7 @@ import {
 } from "@/app/lib/validation/auth.schema";
 import { signIn } from "next-auth/react";
 
-export type SocialAuthProvider = "vk" | "yandex" | "mailru";
+export type SocialAuthProvider = "yandex";
 
 export const login = async (data: LoginData) => {
   const result = await signIn("credentials", {

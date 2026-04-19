@@ -1,6 +1,13 @@
 export const APP_ROLES = ["ROOT", "PM", "EMPLOYEE"] as const;
+export const USER_SPECIALIZATIONS = [
+  "FRONTEND",
+  "BACKEND",
+  "DEVOPS",
+  "PM",
+] as const;
 
 export type AppRole = (typeof APP_ROLES)[number];
+export type UserSpecialization = (typeof USER_SPECIALIZATIONS)[number];
 export const DEFAULT_ROLE: AppRole = "EMPLOYEE";
 
 export const ROLE_LABELS: Record<AppRole, string> = {
@@ -18,8 +25,16 @@ export const ROLE_DESCRIPTIONS: Record<AppRole, string> = {
     "Может просматривать свои задачи, брать их в работу и отмечать выполнение.",
 };
 
+export const USER_SPECIALIZATION_LABELS: Record<UserSpecialization, string> = {
+  FRONTEND: "Frontend",
+  BACKEND: "Backend",
+  DEVOPS: "DevOps",
+  PM: "PM",
+};
+
 export const AUTH_CAPABILITIES = {
   canCreateTeam: ["ROOT"],
+  canManageUsers: ["ROOT"],
   canManageTasks: ["ROOT", "PM"],
   canAssignExecutors: ["ROOT", "PM"],
   canDeleteTasks: ["ROOT", "PM"],

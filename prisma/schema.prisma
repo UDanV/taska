@@ -12,6 +12,13 @@ enum Role {
   EMPLOYEE
 }
 
+enum UserSpecialization {
+  FRONTEND
+  BACKEND
+  DEVOPS
+  PM
+}
+
 enum TeamMemberRole {
   OWNER
   MEMBER
@@ -38,6 +45,7 @@ model User {
   image         String?
   password      String?
   role          Role         @default(EMPLOYEE)
+  specialization UserSpecialization?
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
   accounts      Account[]
@@ -78,6 +86,7 @@ model Task {
   description String?
   status      TaskStatus   @default(TODO)
   priority    TaskPriority @default(MEDIUM)
+  specialization UserSpecialization?
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
   teamId      String

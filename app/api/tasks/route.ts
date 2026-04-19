@@ -31,6 +31,43 @@ function getTaskScope(userId: string, role: string) {
   };
 }
 
+async function validateAssignee(
+  assigneeId: string | null,
+  specialization: string,
+) {
+  if (!assigneeId) {
+    return { assigneeId: null };
+  }
+
+  const assignee = await prisma.user.findUnique({
+    where: { id: assigneeId },
+    select: {
+      id: true,
+      specialization: true,
+    },
+  });
+
+  if (!assignee) {
+    return { error: "Исполнитель не найден", status: 404 as const };
+  }
+
+  if (!assignee.specialization) {
+    return {
+      error: "У выбранного исполнителя не указана специализация",
+      status: 400 as const,
+    };
+  }
+
+  if (assignee.specialization !== specialization) {
+    return {
+      error: "Специализация исполнителя не совпадает с меткой задачи",
+      status: 400 as const,
+    };
+  }
+
+  return { assigneeId: assignee.id };
+}
+
 export async function GET() {
   const user = await getCurrentUser();
 
@@ -47,6 +84,7 @@ export async function GET() {
       description: true,
       status: true,
       priority: true,
+      specialization: true,
       updatedAt: true,
       team: {
         select: {
@@ -65,6 +103,7 @@ export async function GET() {
         select: {
           id: true,
           name: true,
+          specialization: true,
         },
       },
     },
@@ -117,15 +156,28 @@ export async function POST(req: Request) {
       );
     }
 
+    const assigneeValidation = await validateAssignee(
+      data.assigneeId,
+      data.specialization,
+    );
+
+    if ("error" in assigneeValidation) {
+      return NextResponse.json(
+        { error: assigneeValidation.error },
+        { status: assigneeValidation.status },
+      );
+    }
+
     const task = await prisma.task.create({
       data: {
         title: data.title,
         description: data.description,
         status: data.status,
         priority: data.priority,
+        specialization: data.specialization,
         teamId: data.teamId,
         createdById: user.id,
-        assigneeId: data.assigneeId,
+        assigneeId: assigneeValidation.assigneeId,
       },
       select: {
         id: true,
@@ -133,6 +185,7 @@ export async function POST(req: Request) {
         description: true,
         status: true,
         priority: true,
+        specialization: true,
         updatedAt: true,
         team: {
           select: {
@@ -151,6 +204,7 @@ export async function POST(req: Request) {
           select: {
             id: true,
             name: true,
+            specialization: true,
           },
         },
       },

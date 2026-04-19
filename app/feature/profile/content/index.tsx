@@ -5,8 +5,12 @@ import { Avatar, Button, Chip, Input } from "@heroui/react";
 import { BadgeCheck, KeyRound, ShieldCheck, UserRound } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
-import type { AppRole } from "@/app/lib/auth/roles";
-import { ROLE_DESCRIPTIONS, ROLE_LABELS } from "@/app/lib/auth/roles";
+import type { AppRole, UserSpecialization } from "@/app/lib/auth/roles";
+import {
+  ROLE_DESCRIPTIONS,
+  ROLE_LABELS,
+  USER_SPECIALIZATION_LABELS,
+} from "@/app/lib/auth/roles";
 import {
   changePasswordSchema,
   type ChangePasswordData,
@@ -20,6 +24,7 @@ type ProfileContentProps = {
     image: string | null;
     hasPassword: boolean;
     role: AppRole;
+    specialization: UserSpecialization | null;
   };
 };
 
@@ -34,6 +39,9 @@ export default function ProfileContent({ user }: ProfileContentProps) {
   });
   const roleLabel = ROLE_LABELS[user.role];
   const roleDescription = ROLE_DESCRIPTIONS[user.role];
+  const specializationLabel = user.specialization
+    ? USER_SPECIALIZATION_LABELS[user.specialization]
+    : null;
 
   const handleChangePassword = async (data: ChangePasswordData) => {
     const response = await changePassword(data);
@@ -74,6 +82,9 @@ export default function ProfileContent({ user }: ProfileContentProps) {
                 src={user.image ?? undefined}
                 name={user.name || user.email || "Taska"}
                 className="h-20 w-20 bg-primary text-xl font-semibold text-primary-foreground"
+                classNames={{
+                  name: "text-xl font-semibold text-primary-foreground",
+                }}
               />
 
               <div className="space-y-2">
@@ -89,14 +100,10 @@ export default function ProfileContent({ user }: ProfileContentProps) {
                     variant="flat"
                     className="rounded-xl font-medium"
                   >
-                    Роль: {roleLabel}
+                    {roleLabel}
                   </Chip>
-                  <Chip
-                    variant="flat"
-                    className="rounded-xl font-medium"
-                    color={user.hasPassword ? "success" : "warning"}
-                  >
-                    {user.hasPassword ? "Локальный аккаунт" : "Соцлогин"}
+                  <Chip variant="flat" className="rounded-xl font-medium">
+                    Метка: {specializationLabel ?? "Не указана"}
                   </Chip>
                 </div>
               </div>
@@ -113,6 +120,21 @@ export default function ProfileContent({ user }: ProfileContentProps) {
               <p className="font-medium">{roleLabel}</p>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
                 {roleDescription}
+              </p>
+            </div>
+          </section>
+
+          <section className="rounded-[28px] border border-border bg-card p-6 shadow-sm">
+            <div className="flex items-center gap-2">
+              <BadgeCheck size={18} className="text-primary" />
+              <h2 className="text-lg font-semibold">Специализация</h2>
+            </div>
+
+            <div className="mt-5 rounded-3xl bg-muted p-4">
+              <p className="font-medium">{specializationLabel ?? "Не указана"}</p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                Эта метка назначается root и помогает понимать, чем именно
+                занимается сотрудник: frontend, backend, devops или pm.
               </p>
             </div>
           </section>

@@ -31,29 +31,13 @@ const socialProviderMeta: Record<
   SocialAuthProvider,
   { label: string; icon: ReactNode }
 > = {
-  vk: {
-    label: "Продолжить через VK ID",
-    icon: (
-      <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#0077FF] text-xs font-semibold text-white">
-        VK
-      </span>
-    ),
-  },
   yandex: {
     label: "Продолжить через Яндекс ID",
-    icon: <YandexLogo size={24} />,
-  },
-  mailru: {
-    label: "Продолжить через Mail.ru",
-    icon: (
-      <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#005FF9] text-xs font-semibold text-white">
-        @
-      </span>
-    ),
+    icon: <YandexLogo />,
   },
 };
 
-const socialProviderOrder: SocialAuthProvider[] = ["vk", "yandex", "mailru"];
+const socialProviderOrder: SocialAuthProvider[] = ["yandex"];
 
 interface AuthModalProps {
   open: boolean;

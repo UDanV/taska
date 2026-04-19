@@ -13,6 +13,7 @@ export default async function DashboardProfilePage() {
       email: true,
       image: true,
       password: true,
+      specialization: true,
     },
   });
 
@@ -28,6 +29,7 @@ export default async function DashboardProfilePage() {
         image: user.image,
         hasPassword: Boolean(user.password),
         role: currentUser.role,
+        specialization: user.specialization,
       }}
     />
   );

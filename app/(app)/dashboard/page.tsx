@@ -9,16 +9,19 @@ import {
   CheckCircle2,
   Flag,
   LoaderCircle,
-  PenSquare,
   Plus,
   SlidersHorizontal,
   Table,
-  Trash2,
   Users,
 } from "lucide-react";
 import { Button } from "@heroui/button";
-import { Chip, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Textarea } from "@heroui/react";
+import { Chip, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Select, SelectItem, Textarea } from "@heroui/react";
 import { toast } from "sonner";
+import {
+  USER_SPECIALIZATION_LABELS,
+  USER_SPECIALIZATIONS,
+  type UserSpecialization,
+} from "@/app/lib/auth/roles";
 import { useDashboardPreferences } from "@/app/shared/providers/dashboard-preferences";
 import {
   TASK_PRIORITIES,
@@ -47,6 +50,7 @@ type TaskItem = {
   description: string | null;
   status: TaskStatus;
   priority: TaskPriority;
+  specialization: UserSpecialization | null;
   updatedAt: string;
   team: {
     id: string;
@@ -60,29 +64,37 @@ type TaskItem = {
   assignee: {
     id: string;
     name: string | null;
+    specialization: UserSpecialization | null;
   } | null;
 };
 
-const selectClassName =
-  "h-11 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none transition focus:border-primary";
+type TaskAssigneeItem = {
+  id: string;
+  name: string | null;
+  email: string | null;
+  specialization: UserSpecialization;
+};
 
-function getEmptyTaskForm(teamId?: string) {
+type TaskFormState = {
+  title: string;
+  description: string;
+  status: TaskStatus;
+  priority: TaskPriority;
+  specialization: UserSpecialization | "";
+  teamId: string;
+  assigneeId: string;
+};  
+
+function getEmptyTaskForm(teamId?: string): TaskFormState {
   return {
     title: "",
     description: "",
     status: "TODO" as TaskStatus,
     priority: "MEDIUM" as TaskPriority,
+    specialization: "",
     teamId: teamId ?? "",
+    assigneeId: "",
   };
-}
-
-function formatUpdatedAt(value: string) {
-  return new Intl.DateTimeFormat("ru-RU", {
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(value));
 }
 
 export default function DashboardPage() {
@@ -91,6 +103,7 @@ export default function DashboardPage() {
 
   const [teams, setTeams] = useState<TeamItem[]>([]);
   const [tasks, setTasks] = useState<TaskItem[]>([]);
+  const [taskAssignees, setTaskAssignees] = useState<TaskAssigneeItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -102,23 +115,24 @@ export default function DashboardPage() {
     name: "",
     color: TEAM_COLOR_OPTIONS[0],
   });
-  const [taskForm, setTaskForm] = useState(getEmptyTaskForm());
+  const [taskForm, setTaskForm] = useState<TaskFormState>(getEmptyTaskForm());
   const [savingTeam, setSavingTeam] = useState(false);
   const [savingTask, setSavingTask] = useState(false);
-  const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null);
 
   const loadWorkspace = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
-      const [teamsRes, tasksRes] = await Promise.all([
+      const [teamsRes, tasksRes, assigneesRes] = await Promise.all([
         fetch("/api/teams", { cache: "no-store" }),
         fetch("/api/tasks", { cache: "no-store" }),
+        fetch("/api/task-assignees", { cache: "no-store" }),
       ]);
 
       const teamsData = await teamsRes.json();
       const tasksData = await tasksRes.json();
+      const assigneesData = await assigneesRes.json();
 
       if (!teamsRes.ok) {
         throw new Error(teamsData.error || "Не удалось загрузить команды");
@@ -128,8 +142,13 @@ export default function DashboardPage() {
         throw new Error(tasksData.error || "Не удалось загрузить задачи");
       }
 
+      if (!assigneesRes.ok) {
+        throw new Error(assigneesData.error || "Не удалось загрузить исполнителей");
+      }
+
       setTeams(teamsData.teams ?? []);
       setTasks(tasksData.tasks ?? []);
+      setTaskAssignees(assigneesData.users ?? []);
     } catch (loadError) {
       setError(
         loadError instanceof Error
@@ -177,21 +196,20 @@ export default function DashboardPage() {
     };
   }, [loadWorkspace, teams]);
 
-  const boardColumns = useMemo(
-    () =>
-      TASK_STATUSES.map((status) => ({
-        id: status,
-        title: TASK_STATUS_LABELS[status],
-        tasks: tasks.filter((task) => task.status === status),
-      })),
-    [tasks],
-  );
-
   const activeTasks = tasks.filter((task) => task.status !== "DONE");
   const reviewTasksCount = tasks.filter((task) => task.status === "REVIEW").length;
   const doneTasksCount = tasks.filter((task) => task.status === "DONE").length;
   const highPriorityCount = tasks.filter((task) => task.priority === "HIGH").length;
   const focusTasks = activeTasks.slice(0, 3);
+  const compatibleAssignees = useMemo(() => {
+    if (!taskForm.specialization) {
+      return [];
+    }
+
+    return taskAssignees.filter(
+      (assignee) => assignee.specialization === taskForm.specialization,
+    );
+  }, [taskAssignees, taskForm.specialization]);
 
   const handleCreateTeam = async () => {
     setSavingTeam(true);
@@ -264,51 +282,6 @@ export default function DashboardPage() {
       );
     } finally {
       setSavingTask(false);
-    }
-  };
-
-  const handleEditTask = (task: TaskItem) => {
-    setEditingTask(task);
-    setTaskForm({
-      title: task.title,
-      description: task.description ?? "",
-      status: task.status,
-      priority: task.priority,
-      teamId: task.team.id,
-    });
-    setIsTaskModalOpen(true);
-  };
-
-  const handleDeleteTask = async (taskId: string) => {
-    const confirmed = window.confirm("Удалить эту задачу?");
-
-    if (!confirmed) {
-      return;
-    }
-
-    setDeletingTaskId(taskId);
-
-    try {
-      const res = await fetch(`/api/tasks/${taskId}`, {
-        method: "DELETE",
-      });
-
-      const result = await res.json();
-
-      if (!res.ok) {
-        throw new Error(result.error || "Не удалось удалить задачу");
-      }
-
-      toast.success("Задача удалена");
-      window.dispatchEvent(new Event("taska:workspace-updated"));
-    } catch (deleteError) {
-      toast.error(
-        deleteError instanceof Error
-          ? deleteError.message
-          : "Не удалось удалить задачу",
-      );
-    } finally {
-      setDeletingTaskId(null);
     }
   };
 
@@ -444,18 +417,19 @@ export default function DashboardPage() {
                   <div className="flex items-center gap-2">
                     <Table size={18} className="text-primary" />
                     <h2 className="font-semibold text-lg tracking-tight">
-                      Текущие задачи команды
+                      Рабочее пространство задач
                     </h2>
                   </div>
 
                   <div className="flex flex-wrap gap-2">
                     <Button
+                      as={Link}
+                      href="/dashboard/tasks"
                       variant="light"
                       className="rounded-xl"
-                      startContent={<Users size={16} />}
-                      onPress={() => setIsCreateTeamOpen(true)}
+                      startContent={<Table size={16} />}
                     >
-                      Новая команда
+                      Открыть мои задачи
                     </Button>
                     <Button
                       color="primary"
@@ -495,8 +469,8 @@ export default function DashboardPage() {
                       Пока здесь пусто
                     </h3>
                     <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
-                      Создайте свою первую команду, чтобы начать вести задачи,
-                      собирать board и видеть прогресс в одном месте.
+                      Создайте свою первую команду, чтобы открыть отдельное
+                      пространство задач и собирать аналитику на dashboard.
                     </p>
                     <Button
                       color="primary"
@@ -516,8 +490,8 @@ export default function DashboardPage() {
                       Задач пока нет
                     </h3>
                     <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
-                      Команда уже готова. Добавьте первую задачу и распределите ее
-                      по статусам, чтобы доска начала оживать.
+                      Команда уже готова. Добавьте первую задачу, а дальше
+                      работайте с ней в отдельной странице `Мои задачи`.
                     </p>
                     <Button
                       color="primary"
@@ -529,93 +503,21 @@ export default function DashboardPage() {
                     </Button>
                   </div>
                 ) : (
-                  <div className="mt-6 grid gap-4 xl:grid-cols-4">
-                    {boardColumns.map((column) => (
-                      <div key={column.id} className="rounded-[26px] bg-muted p-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <h3 className="font-semibold">{column.title}</h3>
-                            <p className="text-sm text-muted-foreground">
-                              {column.tasks.length} карточек
-                            </p>
-                          </div>
-                          <Chip variant="flat" className="rounded-xl">
-                            {column.tasks.length}
-                          </Chip>
-                        </div>
-
-                        <div className="mt-4 space-y-3">
-                          {column.tasks.length > 0 ? (
-                            column.tasks.map((task) => (
-                              <article
-                                key={task.id}
-                                className="rounded-3xl border border-border bg-background p-4 shadow-sm"
-                              >
-                                <div className="flex items-start justify-between gap-3">
-                                  <div className="min-w-0">
-                                    <div className="flex items-center gap-2">
-                                      <span
-                                        className="h-2.5 w-2.5 shrink-0 rounded-full"
-                                        style={{ backgroundColor: task.team.color }}
-                                      />
-                                      <p className="truncate text-sm text-muted-foreground">
-                                        {task.team.name}
-                                      </p>
-                                    </div>
-                                    <p className="mt-2 font-medium">{task.title}</p>
-                                    {task.description ? (
-                                      <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                                        {task.description}
-                                      </p>
-                                    ) : null}
-                                  </div>
-
-                                  <div className="flex items-center gap-1">
-                                    <Button
-                                      isIconOnly
-                                      size="sm"
-                                      variant="light"
-                                      className="rounded-xl"
-                                      onPress={() => handleEditTask(task)}
-                                    >
-                                      <PenSquare size={16} />
-                                    </Button>
-                                    <Button
-                                      isIconOnly
-                                      size="sm"
-                                      variant="light"
-                                      color="danger"
-                                      className="rounded-xl"
-                                      isLoading={deletingTaskId === task.id}
-                                      onPress={() => void handleDeleteTask(task.id)}
-                                    >
-                                      <Trash2 size={16} />
-                                    </Button>
-                                  </div>
-                                </div>
-
-                                <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                                  <Chip
-                                    color={TASK_PRIORITY_COLORS[task.priority]}
-                                    variant="flat"
-                                    className="rounded-xl"
-                                  >
-                                    {TASK_PRIORITY_LABELS[task.priority]}
-                                  </Chip>
-                                  <span className="text-xs text-muted-foreground">
-                                    Обновлено {formatUpdatedAt(task.updatedAt)}
-                                  </span>
-                                </div>
-                              </article>
-                            ))
-                          ) : (
-                            <div className="rounded-3xl border border-dashed border-border bg-background/70 p-4 text-sm text-muted-foreground">
-                              В этой колонке пока нет задач.
-                            </div>
-                          )}
-                        </div>
+                  <div className="mt-6 space-y-4">
+                    <div className="grid gap-3 md:grid-cols-3">
+                      <div className="rounded-3xl bg-muted p-4">
+                        <p className="text-sm text-muted-foreground">Всего задач</p>
+                        <p className="mt-2 text-3xl font-semibold">{tasks.length}</p>
                       </div>
-                    ))}
+                      <div className="rounded-3xl bg-muted p-4">
+                        <p className="text-sm text-muted-foreground">Активно сейчас</p>
+                        <p className="mt-2 text-3xl font-semibold">{activeTasks.length}</p>
+                      </div>
+                      <div className="rounded-3xl bg-muted p-4">
+                        <p className="text-sm text-muted-foreground">На проверке</p>
+                        <p className="mt-2 text-3xl font-semibold">{reviewTasksCount}</p>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
@@ -800,8 +702,8 @@ export default function DashboardPage() {
                 <div className="grid gap-4 md:grid-cols-3">
                   <div>
                     <p className="mb-2 text-sm font-medium">Команда</p>
-                    <select
-                      className={selectClassName}
+                    <Select
+                      className="h-11 w-full rounded-xl border border-border px-3 text-sm outline-none transition focus:border-primary"
                       value={taskForm.teamId}
                       onChange={(event) =>
                         setTaskForm((current) => ({
@@ -810,21 +712,18 @@ export default function DashboardPage() {
                         }))
                       }
                     >
-                      <option value="" disabled>
-                        Выберите команду
-                      </option>
                       {teams.map((team) => (
-                        <option key={team.id} value={team.id}>
+                        <SelectItem key={team.id}>
                           {team.name}
-                        </option>
+                        </SelectItem>
                       ))}
-                    </select>
+                    </Select>
                   </div>
 
                   <div>
                     <p className="mb-2 text-sm font-medium">Статус</p>
-                    <select
-                      className={selectClassName}
+                    <Select
+                      className="h-11 w-full rounded-xl border border-border px-3 text-sm outline-none transition focus:border-primary"
                       value={taskForm.status}
                       onChange={(event) =>
                         setTaskForm((current) => ({
@@ -834,17 +733,17 @@ export default function DashboardPage() {
                       }
                     >
                       {TASK_STATUSES.map((status) => (
-                        <option key={status} value={status}>
+                        <SelectItem key={status}>
                           {TASK_STATUS_LABELS[status]}
-                        </option>
+                        </SelectItem>
                       ))}
-                    </select>
+                    </Select>
                   </div>
 
                   <div>
                     <p className="mb-2 text-sm font-medium">Приоритет</p>
-                    <select
-                      className={selectClassName}
+                    <Select
+                      className="h-11 w-full rounded-xl border border-border px-3 text-sm outline-none transition focus:border-primary"
                       value={taskForm.priority}
                       onChange={(event) =>
                         setTaskForm((current) => ({
@@ -854,11 +753,98 @@ export default function DashboardPage() {
                       }
                     >
                       {TASK_PRIORITIES.map((priority) => (
-                        <option key={priority} value={priority}>
-                          {TASK_PRIORITY_LABELS[priority]}
-                        </option>
+                        <SelectItem key={priority}>
+                          {TASK_PRIORITY_LABELS[priority as TaskPriority]}
+                        </SelectItem>
                       ))}
-                    </select>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <p className="mb-2 text-sm font-medium">Метка задачи</p>
+                    <Select
+                      className="h-11 w-full rounded-xl border border-border px-3 text-sm outline-none transition focus:border-primary"
+                      value={taskForm.specialization}
+                      placeholder="Выберите специализацию"
+                      onChange={(event) => {
+                        const nextSpecialization = event.target.value as
+                          | UserSpecialization
+                          | "";
+
+                        setTaskForm((current) => {
+                          const nextAssignee = taskAssignees.find(
+                            (assignee: TaskAssigneeItem) =>
+                              assignee.id === current.assigneeId,
+                          );
+
+                          return {
+                            ...current,
+                            specialization: nextSpecialization,
+                            assigneeId:
+                              nextAssignee?.specialization === nextSpecialization
+                                ? current.assigneeId
+                                : "",
+                          };
+                        });
+                      }}
+                    >
+                      {USER_SPECIALIZATIONS.map((specialization) => (
+                        <SelectItem key={specialization}>
+                          {USER_SPECIALIZATION_LABELS[specialization]}
+                        </SelectItem>
+                      ))}
+                    </Select>
+                  </div>
+
+                  <div>
+                    <p className="mb-2 text-sm font-medium">Исполнитель</p>
+                    <Select
+                      className="h-11 w-full rounded-xl border border-border px-3 text-sm outline-none transition focus:border-primary"
+                      value={taskForm.assigneeId}
+                      placeholder={
+                        taskForm.specialization
+                          ? "Выберите исполнителя"
+                          : "Сначала выберите метку"
+                      }
+                      isDisabled={!taskForm.specialization}
+                      onChange={(event) =>
+                        setTaskForm((current) => ({
+                          ...current,
+                          assigneeId: event.target.value,
+                        }))
+                      }
+                    >
+                      {compatibleAssignees.map((assignee: TaskAssigneeItem) => (
+                        <SelectItem key={assignee.id}>
+                          {assignee.name || assignee.email || "Без имени"}
+                        </SelectItem>
+                      ))}
+                    </Select>
+                    {taskForm.specialization ? (
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        Назначать можно только специалиста с меткой{" "}
+                        {USER_SPECIALIZATION_LABELS[
+                          taskForm.specialization as UserSpecialization
+                        ]}
+                        .
+                      </p>
+                    ) : null}
+                    {taskForm.assigneeId ? (
+                      <Button
+                        variant="light"
+                        className="mt-2 h-8 rounded-xl px-3 text-xs"
+                        onPress={() =>
+                          setTaskForm((current) => ({
+                            ...current,
+                            assigneeId: "",
+                          }))
+                        }
+                      >
+                        Снять исполнителя
+                      </Button>
+                    ) : null}
                   </div>
                 </div>
               </ModalBody>

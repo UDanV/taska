@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { USER_SPECIALIZATIONS } from "@/app/lib/auth/roles";
 import {
   TASK_PRIORITIES,
   TASK_STATUSES,
@@ -20,13 +21,14 @@ export const createTaskSchema = z.object({
     .transform((value) => value || undefined),
   status: z.enum(TASK_STATUSES).default("TODO"),
   priority: z.enum(TASK_PRIORITIES).default("MEDIUM"),
+  specialization: z.enum(USER_SPECIALIZATIONS, {
+    message: "Выберите метку задачи",
+  }),
   teamId: z.string().uuid("Неверный идентификатор команды"),
   assigneeId: z
-    .string()
-    .uuid("Неверный идентификатор исполнителя")
+    .union([z.string().uuid("Неверный идентификатор исполнителя"), z.literal(""), z.null()])
     .optional()
-    .or(z.literal(""))
-    .transform((value) => value || undefined),
+    .transform((value) => (value === undefined || value === "" ? null : value)),
 });
 
 export const updateTaskSchema = createTaskSchema
@@ -43,6 +45,17 @@ export const updateTaskSchema = createTaskSchema
       .transform((value) => value || undefined),
     status: z.enum(TASK_STATUSES).optional(),
     priority: z.enum(TASK_PRIORITIES).optional(),
+    specialization: z.enum(USER_SPECIALIZATIONS).optional(),
+    assigneeId: z
+      .union([z.string().uuid("Неверный идентификатор исполнителя"), z.literal(""), z.null()])
+      .optional()
+      .transform((value) => {
+        if (value === undefined) {
+          return undefined;
+        }
+
+        return value === "" ? null : value;
+      }),
   })
   .refine((data) => Object.keys(data).length > 0, {
     message: "Нет данных для обновления",

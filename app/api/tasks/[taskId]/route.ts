@@ -34,6 +34,50 @@ function getTaskScope(userId: string, role: string, taskId: string) {
   };
 }
 
+async function validateAssignee(
+  assigneeId: string | null,
+  specialization: string | null,
+) {
+  if (!assigneeId) {
+    return { assigneeId: null };
+  }
+
+  if (!specialization) {
+    return {
+      error: "Сначала укажите метку задачи, а затем исполнителя",
+      status: 400 as const,
+    };
+  }
+
+  const assignee = await prisma.user.findUnique({
+    where: { id: assigneeId },
+    select: {
+      id: true,
+      specialization: true,
+    },
+  });
+
+  if (!assignee) {
+    return { error: "Исполнитель не найден", status: 404 as const };
+  }
+
+  if (!assignee.specialization) {
+    return {
+      error: "У выбранного исполнителя не указана специализация",
+      status: 400 as const,
+    };
+  }
+
+  if (assignee.specialization !== specialization) {
+    return {
+      error: "Специализация исполнителя не совпадает с меткой задачи",
+      status: 400 as const,
+    };
+  }
+
+  return { assigneeId: assignee.id };
+}
+
 export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ taskId: string }> },
@@ -61,6 +105,8 @@ export async function PATCH(
       where: getTaskScope(user.id, user.role, taskId),
       select: {
         id: true,
+        specialization: true,
+        assigneeId: true,
       },
     });
 
@@ -94,17 +140,37 @@ export async function PATCH(
       }
     }
 
+    const nextSpecialization = data.specialization ?? existingTask.specialization;
+    const nextAssigneeId =
+      data.assigneeId !== undefined ? data.assigneeId : existingTask.assigneeId;
+
+    const assigneeValidation = await validateAssignee(
+      nextAssigneeId,
+      nextSpecialization,
+    );
+
+    if ("error" in assigneeValidation) {
+      return NextResponse.json(
+        { error: assigneeValidation.error },
+        { status: assigneeValidation.status },
+      );
+    }
+
     const task = await prisma.task.update({
       where: {
         id: taskId,
       },
-      data,
+      data: {
+        ...data,
+        assigneeId: assigneeValidation.assigneeId,
+      },
       select: {
         id: true,
         title: true,
         description: true,
         status: true,
         priority: true,
+        specialization: true,
         updatedAt: true,
         team: {
           select: {
@@ -123,6 +189,7 @@ export async function PATCH(
           select: {
             id: true,
             name: true,
+            specialization: true,
           },
         },
       },

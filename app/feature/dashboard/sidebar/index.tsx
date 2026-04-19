@@ -6,8 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   CheckSquare,
-  FolderKanban,
-  UserRound,
+  ShieldCheck,
   Settings,
   Users,
 } from "lucide-react";
@@ -17,25 +16,15 @@ import { hasCapability } from "@/app/lib/auth/roles";
 
 const navigation = [
   {
-    label: "Обзор",
+    label: "Аналитика",
     href: "/dashboard",
     icon: LayoutDashboard,
     exact: true,
   },
   {
     label: "Мои задачи",
-    href: "/dashboard",
+    href: "/dashboard/tasks",
     icon: CheckSquare,
-  },
-  {
-    label: "Проекты",
-    href: "/dashboard",
-    icon: FolderKanban,
-  },
-  {
-    label: "Профиль",
-    href: "/dashboard/profile",
-    icon: UserRound,
   },
   {
     label: "Настройки",
@@ -58,8 +47,19 @@ type DashboardSidebarProps = {
 export default function DashboardSidebar({ userRole }: DashboardSidebarProps) {
   const pathname = usePathname();
   const canCreateTeam = hasCapability(userRole, "canCreateTeam");
+  const canManageUsers = hasCapability(userRole, "canManageUsers");
   const [teams, setTeams] = useState<TeamItem[]>([]);
   const [loadingTeams, setLoadingTeams] = useState(true);
+  const visibleNavigation = canManageUsers
+    ? [
+        ...navigation,
+        {
+          label: "Пользователи",
+          href: "/dashboard/users",
+          icon: ShieldCheck,
+        },
+      ]
+    : navigation;
 
   useEffect(() => {
     const loadTeams = async () => {
@@ -98,7 +98,7 @@ export default function DashboardSidebar({ userRole }: DashboardSidebarProps) {
       <div className="sticky top-16 flex h-[calc(100vh-4rem)] flex-col gap-6 overflow-y-auto px-4 py-6">
 
         <nav className="space-y-2">
-          {navigation.map((item) => {
+          {visibleNavigation.map((item) => {
             const isActive = item.exact
               ? pathname === item.href
               : pathname.startsWith(item.href);
