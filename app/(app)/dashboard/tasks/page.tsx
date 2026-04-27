@@ -44,7 +44,6 @@ import {
   type UserSpecialization,
 } from "@/app/lib/auth/roles";
 import {
-  TASK_PRIORITIES,
   TASK_PRIORITY_COLORS,
   TASK_PRIORITY_LABELS,
   TASK_STATUSES,
@@ -1083,9 +1082,9 @@ export default function TasksPage() {
                 ...teams.map((team) => ({ id: team.id, label: team.name })),
               ]}
             >
-              {(item: { id: string; label: string }) => (
-                <UnifiedSelectItem key={item.id}>{item.label}</UnifiedSelectItem>
-              )}
+              {teams.map((team) => (
+                <UnifiedSelectItem key={team.id}>{team.name}</UnifiedSelectItem>
+              ))}
             </UnifiedSelect>
 
             <UnifiedSelect
@@ -1102,9 +1101,9 @@ export default function TasksPage() {
                 })),
               ]}
             >
-              {(item: { id: string; label: string }) => (
-                <UnifiedSelectItem key={item.id}>{item.label}</UnifiedSelectItem>
-              )}
+              {TASK_STATUSES.map((status) => (
+                <UnifiedSelectItem key={status}>{TASK_STATUS_LABELS[status]}</UnifiedSelectItem>
+              ))}
             </UnifiedSelect>
 
             <UnifiedSelect
@@ -1123,9 +1122,9 @@ export default function TasksPage() {
                 })),
               ]}
             >
-              {(item: { id: string; label: string }) => (
-                <UnifiedSelectItem key={item.id}>{item.label}</UnifiedSelectItem>
-              )}
+              {USER_SPECIALIZATIONS.map((specialization) => (
+                <UnifiedSelectItem key={specialization}>{USER_SPECIALIZATION_LABELS[specialization]}</UnifiedSelectItem>
+              ))}
             </UnifiedSelect>
 
             <div className="flex items-center px-1">

@@ -53,7 +53,7 @@ type TeamItem = {
 export default function DashboardSidebar() {
   const { data: session } = useSession();
   const pathname = usePathname();
-  const [teams, setTeams] = useState<TeamItem[]>([]);
+  const [, setTeams] = useState<TeamItem[]>([]);
   const visibleNavigation = navigation.filter((item) => {
     if (item.href !== "/dashboard/users") {
       return true;

@@ -1,10 +1,10 @@
 "use client";
 
-import type { ComponentProps } from "react";
+import type { ComponentProps, ReactNode } from "react";
 import { Select, SelectItem } from "@heroui/react";
 
 type UnifiedSelectProps = Omit<ComponentProps<typeof Select>, "children"> & {
-  children?: any;
+  children?: ReactNode;
 };
 
 export function UnifiedSelect({ classNames, ...props }: UnifiedSelectProps) {
