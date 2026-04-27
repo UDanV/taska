@@ -16,7 +16,7 @@ export async function POST(req: Request) {
       return NextResponse.json(
         {
           error: existingUser.password
-            ? "Email is already in use"
+            ? "Этот email уже зарегистрирован"
             : "Этот email уже привязан к аккаунту через соцсеть",
         },
         { status: 400 },

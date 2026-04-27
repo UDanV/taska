@@ -52,8 +52,10 @@ model User {
   sessions      Session[]
   teamMembers   TeamMember[]
   teamsCreated  Team[]       @relation("TeamCreator")
+  teamsManaged  Team[]       @relation("TeamManager")
   tasksCreated  Task[]       @relation("TaskCreator")
   tasksAssigned Task[]       @relation("TaskAssignee")
+  taskComments  TaskComment[]
 }
 
 model Team {
@@ -63,7 +65,9 @@ model Team {
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
   createdById String
+  pmId        String
   createdBy   User         @relation("TeamCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  pm          User         @relation("TeamManager", fields: [pmId], references: [id], onDelete: Restrict)
   members     TeamMember[]
   tasks       Task[]
 }
@@ -84,6 +88,7 @@ model Task {
   id          String       @id @default(uuid())
   title       String
   description String?
+  photos      String[]     @default([])
   status      TaskStatus   @default(TODO)
   priority    TaskPriority @default(MEDIUM)
   specialization UserSpecialization?
@@ -95,6 +100,19 @@ model Task {
   team        Team         @relation(fields: [teamId], references: [id], onDelete: Cascade)
   createdBy   User         @relation("TaskCreator", fields: [createdById], references: [id], onDelete: Cascade)
   assignee    User?        @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  comments    TaskComment[]
+}
+
+model TaskComment {
+  id        String   @id @default(uuid())
+  body      String
+  createdAt DateTime @default(now())
+  taskId    String
+  userId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
 }
 
 model Account {

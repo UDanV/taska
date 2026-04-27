@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Calendar,
   ChartBar,
@@ -15,24 +15,25 @@ import {
   Users,
 } from "lucide-react";
 import { Button } from "@heroui/button";
-import { Chip, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Select, SelectItem, Textarea } from "@heroui/react";
+import { Chip, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from "@heroui/react";
 import { toast } from "sonner";
 import {
-  USER_SPECIALIZATION_LABELS,
-  USER_SPECIALIZATIONS,
   type UserSpecialization,
 } from "@/app/lib/auth/roles";
 import { useDashboardPreferences } from "@/app/shared/providers/dashboard-preferences";
 import {
-  TASK_PRIORITIES,
   TASK_PRIORITY_COLORS,
   TASK_PRIORITY_LABELS,
-  TASK_STATUSES,
-  TASK_STATUS_LABELS,
   TEAM_COLOR_OPTIONS,
   type TaskPriority,
   type TaskStatus,
 } from "@/app/lib/workspace/constants";
+import TaskEditorModal, {
+  createEmptyTaskForm,
+  type TaskModalAssigneeItem,
+  type TaskModalFormState,
+} from "@/app/feature/tasks/task-editor-modal";
+import { UnifiedSelect, UnifiedSelectItem } from "@/app/feature/tasks/ui/unified-select";
 
 type TeamColor = (typeof TEAM_COLOR_OPTIONS)[number];
 
@@ -42,6 +43,13 @@ type TeamItem = {
   color: string;
   membersCount: number;
   tasksCount: number;
+};
+
+type TeamManagerItem = {
+  id: string;
+  name: string | null;
+  email: string | null;
+  role: "ROOT" | "PM" | "EMPLOYEE";
 };
 
 type TaskItem = {
@@ -68,34 +76,9 @@ type TaskItem = {
   } | null;
 };
 
-type TaskAssigneeItem = {
-  id: string;
-  name: string | null;
-  email: string | null;
-  specialization: UserSpecialization;
-};
+type TaskAssigneeItem = TaskModalAssigneeItem;
 
-type TaskFormState = {
-  title: string;
-  description: string;
-  status: TaskStatus;
-  priority: TaskPriority;
-  specialization: UserSpecialization | "";
-  teamId: string;
-  assigneeId: string;
-};  
-
-function getEmptyTaskForm(teamId?: string): TaskFormState {
-  return {
-    title: "",
-    description: "",
-    status: "TODO" as TaskStatus,
-    priority: "MEDIUM" as TaskPriority,
-    specialization: "",
-    teamId: teamId ?? "",
-    assigneeId: "",
-  };
-}
+type TaskFormState = TaskModalFormState;
 
 export default function DashboardPage() {
   const { visibleSections } = useDashboardPreferences();
@@ -111,11 +94,17 @@ export default function DashboardPage() {
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<TaskItem | null>(null);
 
-  const [teamForm, setTeamForm] = useState<{ name: string; color: TeamColor }>({
+  const [teamManagers, setTeamManagers] = useState<TeamManagerItem[]>([]);
+  const [teamForm, setTeamForm] = useState<{
+    name: string;
+    color: TeamColor;
+    pmId: string;
+  }>({
     name: "",
     color: TEAM_COLOR_OPTIONS[0],
+    pmId: "",
   });
-  const [taskForm, setTaskForm] = useState<TaskFormState>(getEmptyTaskForm());
+  const [taskForm, setTaskForm] = useState<TaskFormState>(createEmptyTaskForm());
   const [savingTeam, setSavingTeam] = useState(false);
   const [savingTask, setSavingTask] = useState(false);
 
@@ -160,13 +149,42 @@ export default function DashboardPage() {
     }
   }, []);
 
+  const loadTeamManagers = useCallback(async () => {
+    try {
+      const res = await fetch("/api/team-managers", { cache: "no-store" });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setTeamManagers([]);
+        return;
+      }
+
+      const managers = data.managers ?? [];
+      setTeamManagers(managers);
+      setTeamForm((current) => ({
+        ...current,
+        pmId: current.pmId || managers[0]?.id || "",
+      }));
+    } catch {
+      setTeamManagers([]);
+    }
+  }, []);
+
   useEffect(() => {
     void loadWorkspace();
   }, [loadWorkspace]);
 
   useEffect(() => {
+    void loadTeamManagers();
+  }, [loadTeamManagers]);
+
+  useEffect(() => {
     const openTeamModal = () => {
-      setTeamForm({ name: "", color: TEAM_COLOR_OPTIONS[0] });
+      setTeamForm({
+        name: "",
+        color: TEAM_COLOR_OPTIONS[0],
+        pmId: teamManagers[0]?.id ?? "",
+      });
       setIsCreateTeamOpen(true);
     };
 
@@ -177,7 +195,7 @@ export default function DashboardPage() {
       }
 
       setEditingTask(null);
-      setTaskForm(getEmptyTaskForm(teams[0]?.id));
+      setTaskForm(createEmptyTaskForm(teams[0]?.id));
       setIsTaskModalOpen(true);
     };
 
@@ -194,22 +212,13 @@ export default function DashboardPage() {
       window.removeEventListener("taska:create-task", openTaskModal);
       window.removeEventListener("taska:workspace-updated", refreshWorkspace);
     };
-  }, [loadWorkspace, teams]);
+  }, [loadWorkspace, teamManagers, teams]);
 
   const activeTasks = tasks.filter((task) => task.status !== "DONE");
   const reviewTasksCount = tasks.filter((task) => task.status === "REVIEW").length;
   const doneTasksCount = tasks.filter((task) => task.status === "DONE").length;
   const highPriorityCount = tasks.filter((task) => task.priority === "HIGH").length;
   const focusTasks = activeTasks.slice(0, 3);
-  const compatibleAssignees = useMemo(() => {
-    if (!taskForm.specialization) {
-      return [];
-    }
-
-    return taskAssignees.filter(
-      (assignee) => assignee.specialization === taskForm.specialization,
-    );
-  }, [taskAssignees, taskForm.specialization]);
 
   const handleCreateTeam = async () => {
     setSavingTeam(true);
@@ -231,7 +240,11 @@ export default function DashboardPage() {
 
       toast.success("Команда создана");
       setIsCreateTeamOpen(false);
-      setTeamForm({ name: "", color: TEAM_COLOR_OPTIONS[0] });
+      setTeamForm({
+        name: "",
+        color: TEAM_COLOR_OPTIONS[0],
+        pmId: teamManagers[0]?.id ?? "",
+      });
       setTaskForm((current) => ({
         ...current,
         teamId: current.teamId || result.team.id,
@@ -272,7 +285,7 @@ export default function DashboardPage() {
       toast.success(editingTask ? "Задача обновлена" : "Задача создана");
       setIsTaskModalOpen(false);
       setEditingTask(null);
-      setTaskForm(getEmptyTaskForm(teams[0]?.id));
+      setTaskForm(createEmptyTaskForm(teams[0]?.id));
       window.dispatchEvent(new Event("taska:workspace-updated"));
     } catch (taskError) {
       toast.error(
@@ -292,7 +305,7 @@ export default function DashboardPage() {
     }
 
     setEditingTask(null);
-    setTaskForm(getEmptyTaskForm(teams[0]?.id));
+    setTaskForm(createEmptyTaskForm(teams[0]?.id));
     setIsTaskModalOpen(true);
   };
 
@@ -429,7 +442,7 @@ export default function DashboardPage() {
                       className="rounded-xl"
                       startContent={<Table size={16} />}
                     >
-                      Открыть мои задачи
+                      Список задач
                     </Button>
                     <Button
                       color="primary"
@@ -491,7 +504,7 @@ export default function DashboardPage() {
                     </h3>
                     <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
                       Команда уже готова. Добавьте первую задачу, а дальше
-                      работайте с ней в отдельной странице `Мои задачи`.
+                      работайте с ней в отдельной странице `Задачи`.
                     </p>
                     <Button
                       color="primary"
@@ -648,6 +661,26 @@ export default function DashboardPage() {
                     ))}
                   </div>
                 </div>
+
+                <div>
+                  <p className="mb-2 text-sm font-medium">PM команды</p>
+                  <UnifiedSelect
+                    selectedKeys={teamForm.pmId ? [teamForm.pmId] : []}
+                    onChange={(event) =>
+                      setTeamForm((current) => ({
+                        ...current,
+                        pmId: event.target.value,
+                      }))
+                    }
+                    placeholder="Выберите PM"
+                  >
+                    {teamManagers.map((manager) => (
+                      <UnifiedSelectItem key={manager.id}>
+                        {manager.name || manager.email || "Без имени"}
+                      </UnifiedSelectItem>
+                    ))}
+                  </UnifiedSelect>
+                </div>
               </ModalBody>
               <ModalFooter>
                 <Button variant="light" className="rounded-xl" onPress={onClose}>
@@ -657,6 +690,7 @@ export default function DashboardPage() {
                   color="primary"
                   className="rounded-xl"
                   isLoading={savingTeam}
+                  isDisabled={!teamForm.pmId}
                   onPress={() => void handleCreateTeam()}
                 >
                   Создать команду
@@ -667,204 +701,17 @@ export default function DashboardPage() {
         </ModalContent>
       </Modal>
 
-      <Modal isOpen={isTaskModalOpen} onOpenChange={setIsTaskModalOpen}>
-        <ModalContent className="rounded-[28px]">
-          {(onClose) => (
-            <>
-              <ModalHeader>
-                {editingTask ? "Редактировать задачу" : "Новая задача"}
-              </ModalHeader>
-              <ModalBody className="space-y-4 pb-2">
-                <Input
-                  label="Название"
-                  labelPlacement="outside"
-                  placeholder="Что нужно сделать?"
-                  value={taskForm.title}
-                  onValueChange={(value) =>
-                    setTaskForm((current) => ({ ...current, title: value }))
-                  }
-                />
-
-                <div>
-                  <p className="mb-2 text-sm font-medium">Описание</p>
-                  <Textarea
-                    placeholder="Коротко опишите задачу"
-                    value={taskForm.description}
-                    onValueChange={(value) =>
-                      setTaskForm((current) => ({
-                        ...current,
-                        description: value,
-                      }))
-                    }
-                  />
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-3">
-                  <div>
-                    <p className="mb-2 text-sm font-medium">Команда</p>
-                    <Select
-                      className="h-11 w-full rounded-xl border border-border px-3 text-sm outline-none transition focus:border-primary"
-                      value={taskForm.teamId}
-                      onChange={(event) =>
-                        setTaskForm((current) => ({
-                          ...current,
-                          teamId: event.target.value,
-                        }))
-                      }
-                    >
-                      {teams.map((team) => (
-                        <SelectItem key={team.id}>
-                          {team.name}
-                        </SelectItem>
-                      ))}
-                    </Select>
-                  </div>
-
-                  <div>
-                    <p className="mb-2 text-sm font-medium">Статус</p>
-                    <Select
-                      className="h-11 w-full rounded-xl border border-border px-3 text-sm outline-none transition focus:border-primary"
-                      value={taskForm.status}
-                      onChange={(event) =>
-                        setTaskForm((current) => ({
-                          ...current,
-                          status: event.target.value as TaskStatus,
-                        }))
-                      }
-                    >
-                      {TASK_STATUSES.map((status) => (
-                        <SelectItem key={status}>
-                          {TASK_STATUS_LABELS[status]}
-                        </SelectItem>
-                      ))}
-                    </Select>
-                  </div>
-
-                  <div>
-                    <p className="mb-2 text-sm font-medium">Приоритет</p>
-                    <Select
-                      className="h-11 w-full rounded-xl border border-border px-3 text-sm outline-none transition focus:border-primary"
-                      value={taskForm.priority}
-                      onChange={(event) =>
-                        setTaskForm((current) => ({
-                          ...current,
-                          priority: event.target.value as TaskPriority,
-                        }))
-                      }
-                    >
-                      {TASK_PRIORITIES.map((priority) => (
-                        <SelectItem key={priority}>
-                          {TASK_PRIORITY_LABELS[priority as TaskPriority]}
-                        </SelectItem>
-                      ))}
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div>
-                    <p className="mb-2 text-sm font-medium">Метка задачи</p>
-                    <Select
-                      className="h-11 w-full rounded-xl border border-border px-3 text-sm outline-none transition focus:border-primary"
-                      value={taskForm.specialization}
-                      placeholder="Выберите специализацию"
-                      onChange={(event) => {
-                        const nextSpecialization = event.target.value as
-                          | UserSpecialization
-                          | "";
-
-                        setTaskForm((current) => {
-                          const nextAssignee = taskAssignees.find(
-                            (assignee: TaskAssigneeItem) =>
-                              assignee.id === current.assigneeId,
-                          );
-
-                          return {
-                            ...current,
-                            specialization: nextSpecialization,
-                            assigneeId:
-                              nextAssignee?.specialization === nextSpecialization
-                                ? current.assigneeId
-                                : "",
-                          };
-                        });
-                      }}
-                    >
-                      {USER_SPECIALIZATIONS.map((specialization) => (
-                        <SelectItem key={specialization}>
-                          {USER_SPECIALIZATION_LABELS[specialization]}
-                        </SelectItem>
-                      ))}
-                    </Select>
-                  </div>
-
-                  <div>
-                    <p className="mb-2 text-sm font-medium">Исполнитель</p>
-                    <Select
-                      className="h-11 w-full rounded-xl border border-border px-3 text-sm outline-none transition focus:border-primary"
-                      value={taskForm.assigneeId}
-                      placeholder={
-                        taskForm.specialization
-                          ? "Выберите исполнителя"
-                          : "Сначала выберите метку"
-                      }
-                      isDisabled={!taskForm.specialization}
-                      onChange={(event) =>
-                        setTaskForm((current) => ({
-                          ...current,
-                          assigneeId: event.target.value,
-                        }))
-                      }
-                    >
-                      {compatibleAssignees.map((assignee: TaskAssigneeItem) => (
-                        <SelectItem key={assignee.id}>
-                          {assignee.name || assignee.email || "Без имени"}
-                        </SelectItem>
-                      ))}
-                    </Select>
-                    {taskForm.specialization ? (
-                      <p className="mt-2 text-xs text-muted-foreground">
-                        Назначать можно только специалиста с меткой{" "}
-                        {USER_SPECIALIZATION_LABELS[
-                          taskForm.specialization as UserSpecialization
-                        ]}
-                        .
-                      </p>
-                    ) : null}
-                    {taskForm.assigneeId ? (
-                      <Button
-                        variant="light"
-                        className="mt-2 h-8 rounded-xl px-3 text-xs"
-                        onPress={() =>
-                          setTaskForm((current) => ({
-                            ...current,
-                            assigneeId: "",
-                          }))
-                        }
-                      >
-                        Снять исполнителя
-                      </Button>
-                    ) : null}
-                  </div>
-                </div>
-              </ModalBody>
-              <ModalFooter>
-                <Button variant="light" className="rounded-xl" onPress={onClose}>
-                  Отмена
-                </Button>
-                <Button
-                  color="primary"
-                  className="rounded-xl"
-                  isLoading={savingTask}
-                  onPress={() => void handleCreateTask()}
-                >
-                  {editingTask ? "Сохранить изменения" : "Создать задачу"}
-                </Button>
-              </ModalFooter>
-            </>
-          )}
-        </ModalContent>
-      </Modal>
+      <TaskEditorModal
+        isOpen={isTaskModalOpen}
+        onOpenChange={setIsTaskModalOpen}
+        isEditing={Boolean(editingTask)}
+        taskForm={taskForm}
+        setTaskForm={setTaskForm}
+        teams={teams.map((team) => ({ id: team.id, name: team.name }))}
+        taskAssignees={taskAssignees}
+        isSaving={savingTask}
+        onSubmit={handleCreateTask}
+      />
     </>
   );
 }

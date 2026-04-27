@@ -1,12 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSession } from "next-auth/react";
 import {
   Calendar,
   ChevronLeft,
   ChevronRight,
   Columns3,
   Flag,
+  ImagePlus,
   LoaderCircle,
   MoreHorizontal,
   PenSquare,
@@ -15,12 +17,28 @@ import {
   Table,
   Trash2,
   Users,
+  X,
 } from "lucide-react";
 import { Button } from "@heroui/button";
 import { Dropdown, DropdownItem, DropdownMenu, DropdownTrigger } from "@heroui/dropdown";
-import { Chip, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Select, SelectItem, Textarea } from "@heroui/react";
+import {
+  Checkbox,
+  Chip,
+  Drawer,
+  DrawerBody,
+  DrawerContent,
+  DrawerHeader,
+  Input,
+  Modal,
+  ModalBody,
+  ModalContent,
+  ModalFooter,
+  ModalHeader,
+  Textarea,
+} from "@heroui/react";
 import { toast } from "sonner";
 import {
+  hasCapability,
   USER_SPECIALIZATION_LABELS,
   USER_SPECIALIZATIONS,
   type UserSpecialization,
@@ -35,6 +53,12 @@ import {
   type TaskPriority,
   type TaskStatus,
 } from "@/app/lib/workspace/constants";
+import TaskEditorModal, {
+  createEmptyTaskForm,
+  type TaskModalAssigneeItem,
+  type TaskModalFormState,
+} from "@/app/feature/tasks/task-editor-modal";
+import { UnifiedSelect, UnifiedSelectItem } from "@/app/feature/tasks/ui/unified-select";
 
 type TeamColor = (typeof TEAM_COLOR_OPTIONS)[number];
 type TaskViewMode = "list" | "kanban" | "scrum" | "calendar";
@@ -47,17 +71,20 @@ type TeamItem = {
   tasksCount: number;
 };
 
-type TaskAssigneeItem = {
+type TeamManagerItem = {
   id: string;
   name: string | null;
   email: string | null;
-  specialization: UserSpecialization;
+  role: "ROOT" | "PM" | "EMPLOYEE";
 };
+
+type TaskAssigneeItem = TaskModalAssigneeItem;
 
 type TaskItem = {
   id: string;
   title: string;
   description: string | null;
+  photos: string[];
   status: TaskStatus;
   priority: TaskPriority;
   specialization: UserSpecialization | null;
@@ -78,15 +105,29 @@ type TaskItem = {
   } | null;
 };
 
-type TaskFormState = {
+type TaskCommentItem = {
+  id: string;
+  body: string;
+  createdAt: string;
+  user: {
+    id: string;
+    name: string | null;
+    email: string | null;
+  };
+};
+
+type TaskFormState = TaskModalFormState;
+
+type TaskPatchPayload = Partial<{
   title: string;
   description: string;
   status: TaskStatus;
   priority: TaskPriority;
-  specialization: UserSpecialization | "";
+  specialization: UserSpecialization;
   teamId: string;
-  assigneeId: string;
-};
+  assigneeId: string | null;
+  photos: string[];
+}>;
 
 const viewOptions: Array<{
   id: TaskViewMode;
@@ -99,22 +140,20 @@ const viewOptions: Array<{
     { id: "calendar", label: "Календарь", icon: Calendar },
   ];
 
-function getEmptyTaskForm(teamId?: string): TaskFormState {
-  return {
-    title: "",
-    description: "",
-    status: "TODO" as TaskStatus,
-    priority: "MEDIUM" as TaskPriority,
-    specialization: "",
-    teamId: teamId ?? "",
-    assigneeId: "",
-  };
-}
-
 function formatUpdatedAt(value: string) {
   return new Intl.DateTimeFormat("ru-RU", {
     day: "2-digit",
     month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
+function formatCommentAt(value: string) {
+  return new Intl.DateTimeFormat("ru-RU", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(value));
@@ -148,7 +187,29 @@ function addDays(base: Date, amount: number) {
   return next;
 }
 
+async function fileToDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+        return;
+      }
+
+      reject(new Error("Не удалось прочитать файл"));
+    };
+
+    reader.onerror = () => {
+      reject(new Error("Не удалось прочитать файл"));
+    };
+
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function TasksPage() {
+  const { data: session } = useSession();
   const [teams, setTeams] = useState<TeamItem[]>([]);
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [taskAssignees, setTaskAssignees] = useState<TaskAssigneeItem[]>([]);
@@ -159,20 +220,41 @@ export default function TasksPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [teamFilter, setTeamFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState<"ALL" | TaskStatus>("ALL");
+  const [specializationFilter, setSpecializationFilter] = useState<
+    "ALL" | UserSpecialization
+  >("ALL");
+  const [assignedToMeOnly, setAssignedToMeOnly] = useState(false);
   const [calendarDate, setCalendarDate] = useState(() => new Date());
 
   const [isCreateTeamOpen, setIsCreateTeamOpen] = useState(false);
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<TaskItem | null>(null);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [isTaskDrawerOpen, setIsTaskDrawerOpen] = useState(false);
+  const [taskComments, setTaskComments] = useState<TaskCommentItem[]>([]);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [commentDraft, setCommentDraft] = useState("");
+  const [postingComment, setPostingComment] = useState(false);
 
-  const [teamForm, setTeamForm] = useState<{ name: string; color: TeamColor }>({
+  const [teamManagers, setTeamManagers] = useState<TeamManagerItem[]>([]);
+  const [teamForm, setTeamForm] = useState<{
+    name: string;
+    color: TeamColor;
+    pmId: string;
+  }>({
     name: "",
     color: TEAM_COLOR_OPTIONS[0],
+    pmId: "",
   });
-  const [taskForm, setTaskForm] = useState<TaskFormState>(getEmptyTaskForm());
+  const [taskForm, setTaskForm] = useState<TaskFormState>(createEmptyTaskForm());
   const [savingTeam, setSavingTeam] = useState(false);
   const [savingTask, setSavingTask] = useState(false);
+  const [savingPhotos, setSavingPhotos] = useState(false);
   const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null);
+  const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
+  const [dragOverStatus, setDragOverStatus] = useState<TaskStatus | null>(null);
+  const canManageTasks = hasCapability(session?.user?.role, "canManageTasks");
+  const currentUserId = session?.user?.id ?? null;
 
   const loadWorkspace = useCallback(async () => {
     setLoading(true);
@@ -202,7 +284,12 @@ export default function TasksPage() {
       }
 
       setTeams(teamsData.teams ?? []);
-      setTasks(tasksData.tasks ?? []);
+      setTasks(
+        (tasksData.tasks ?? []).map((task: TaskItem) => ({
+          ...task,
+          photos: Array.isArray(task.photos) ? task.photos : [],
+        })),
+      );
       setTaskAssignees(assigneesData.users ?? []);
     } catch (loadError) {
       setError(
@@ -215,13 +302,89 @@ export default function TasksPage() {
     }
   }, []);
 
+  const loadTeamManagers = useCallback(async () => {
+    try {
+      const res = await fetch("/api/team-managers", { cache: "no-store" });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setTeamManagers([]);
+        return;
+      }
+
+      const managers = data.managers ?? [];
+      setTeamManagers(managers);
+      setTeamForm((current) => ({
+        ...current,
+        pmId: current.pmId || managers[0]?.id || "",
+      }));
+    } catch {
+      setTeamManagers([]);
+    }
+  }, []);
+
   useEffect(() => {
     void loadWorkspace();
   }, [loadWorkspace]);
 
   useEffect(() => {
+    void loadTeamManagers();
+  }, [loadTeamManagers]);
+
+  useEffect(() => {
+    if (!isTaskDrawerOpen || !selectedTaskId) {
+      setTaskComments([]);
+      setCommentDraft("");
+      return;
+    }
+
+    let cancelled = false;
+    setCommentsLoading(true);
+
+    void (async () => {
+      try {
+        const res = await fetch(`/api/tasks/${selectedTaskId}/comments`, {
+          cache: "no-store",
+        });
+        const data = await res.json();
+
+        if (cancelled) {
+          return;
+        }
+
+        if (!res.ok) {
+          throw new Error(data.error || "Не удалось загрузить комментарии");
+        }
+
+        setTaskComments(data.comments ?? []);
+      } catch (loadCommentsError) {
+        if (!cancelled) {
+          setTaskComments([]);
+          toast.error(
+            loadCommentsError instanceof Error
+              ? loadCommentsError.message
+              : "Не удалось загрузить комментарии",
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setCommentsLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isTaskDrawerOpen, selectedTaskId]);
+
+  useEffect(() => {
     const openTeamModal = () => {
-      setTeamForm({ name: "", color: TEAM_COLOR_OPTIONS[0] });
+      setTeamForm({
+        name: "",
+        color: TEAM_COLOR_OPTIONS[0],
+        pmId: teamManagers[0]?.id ?? "",
+      });
       setIsCreateTeamOpen(true);
     };
 
@@ -232,7 +395,7 @@ export default function TasksPage() {
       }
 
       setEditingTask(null);
-      setTaskForm(getEmptyTaskForm(teams[0]?.id));
+      setTaskForm(createEmptyTaskForm(teams[0]?.id));
       setIsTaskModalOpen(true);
     };
 
@@ -249,7 +412,7 @@ export default function TasksPage() {
       window.removeEventListener("taska:create-task", openTaskModal);
       window.removeEventListener("taska:workspace-updated", refreshWorkspace);
     };
-  }, [loadWorkspace, teams]);
+  }, [loadWorkspace, teamManagers, teams]);
 
   const filteredTasks = useMemo(() => {
     const normalizedSearch = searchQuery.trim().toLowerCase();
@@ -262,6 +425,17 @@ export default function TasksPage() {
 
         if (statusFilter !== "ALL" && task.status !== statusFilter) {
           return false;
+        }
+
+        if (
+          specializationFilter !== "ALL" &&
+          task.specialization !== specializationFilter
+        ) {
+          return false;
+        }
+
+        if (assignedToMeOnly) {
+          return task.assignee?.id === currentUserId;
         }
 
         if (!normalizedSearch) {
@@ -285,7 +459,15 @@ export default function TasksPage() {
         (left, right) =>
           new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime(),
       );
-  }, [searchQuery, statusFilter, tasks, teamFilter]);
+  }, [
+    assignedToMeOnly,
+    currentUserId,
+    searchQuery,
+    specializationFilter,
+    statusFilter,
+    tasks,
+    teamFilter,
+  ]);
 
   const boardColumns = useMemo(
     () =>
@@ -323,16 +505,6 @@ export default function TasksPage() {
     [filteredTasks],
   );
 
-  const compatibleAssignees = useMemo(() => {
-    if (!taskForm.specialization) {
-      return [];
-    }
-
-    return taskAssignees.filter(
-      (assignee) => assignee.specialization === taskForm.specialization,
-    );
-  }, [taskAssignees, taskForm.specialization]);
-
   const tasksByDate = useMemo(() => {
     const grouped = new Map<string, TaskItem[]>();
 
@@ -367,6 +539,202 @@ export default function TasksPage() {
     });
   }, [calendarDate, tasksByDate]);
 
+  const selectedTask = useMemo(
+    () => tasks.find((task) => task.id === selectedTaskId) ?? null,
+    [selectedTaskId, tasks],
+  );
+
+  const patchTask = useCallback(async (taskId: string, payload: TaskPatchPayload) => {
+    const res = await fetch(`/api/tasks/${taskId}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const result = await res.json();
+
+    if (!res.ok) {
+      throw new Error(result.error || "Не удалось обновить задачу");
+    }
+
+    return {
+      ...result.task,
+      photos: Array.isArray(result.task?.photos) ? result.task.photos : [],
+    } as TaskItem;
+  }, []);
+
+  const upsertTask = useCallback((nextTask: TaskItem) => {
+    setTasks((current) =>
+      current.map((task) => (task.id === nextTask.id ? nextTask : task)),
+    );
+  }, []);
+
+  const handleOpenTaskDrawer = useCallback((taskId: string) => {
+    setSelectedTaskId(taskId);
+    setIsTaskDrawerOpen(true);
+  }, []);
+
+  const handleTaskStatusDrop = useCallback(
+    async (taskId: string, status: TaskStatus) => {
+      const sourceTask = tasks.find((task) => task.id === taskId);
+
+      if (!sourceTask || sourceTask.status === status) {
+        return;
+      }
+
+      if (
+        !canManageTasks &&
+        (sourceTask.assignee?.id !== currentUserId ||
+          (status !== "REVIEW" && status !== "DONE"))
+      ) {
+        toast.error("Вы можете переводить только свои задачи в 'На проверке' или 'Готово'");
+        return;
+      }
+
+      setTasks((current) =>
+        current.map((task) =>
+          task.id === taskId ? { ...task, status, updatedAt: new Date().toISOString() } : task,
+        ),
+      );
+
+      try {
+        const updatedTask = await patchTask(taskId, { status });
+        upsertTask(updatedTask);
+      } catch (statusError) {
+        setTasks((current) =>
+          current.map((task) =>
+            task.id === taskId ? { ...task, status: sourceTask.status } : task,
+          ),
+        );
+        toast.error(
+          statusError instanceof Error
+            ? statusError.message
+            : "Не удалось переместить задачу",
+        );
+      }
+    },
+    [canManageTasks, currentUserId, patchTask, tasks, upsertTask],
+  );
+
+  const handleTaskPhotoUpload = useCallback(
+    async (files: FileList | null) => {
+      if (!selectedTask || !files) {
+        return;
+      }
+
+      const allFiles = Array.from(files);
+      const imageFiles = allFiles.filter((file) => file.type.startsWith("image/"));
+
+      if (imageFiles.length !== allFiles.length) {
+        toast.error("Можно загружать только фотографии");
+        return;
+      }
+
+      const currentPhotos = selectedTask.photos ?? [];
+      const maxPhotos = 8;
+      const remainingSlots = maxPhotos - currentPhotos.length;
+
+      if (remainingSlots <= 0) {
+        toast.error("Для задачи уже загружено максимальное количество фото");
+        return;
+      }
+
+      const filesToUpload = imageFiles.slice(0, remainingSlots);
+
+      if (filesToUpload.length < imageFiles.length) {
+        toast.info(`Добавлено ${filesToUpload.length} из ${imageFiles.length} фото`);
+      }
+
+      setSavingPhotos(true);
+
+      try {
+        const uploadedPhotos = await Promise.all(filesToUpload.map(fileToDataUrl));
+        const nextPhotos = [...currentPhotos, ...uploadedPhotos];
+        const updatedTask = await patchTask(selectedTask.id, { photos: nextPhotos });
+
+        upsertTask(updatedTask);
+        toast.success("Фотографии загружены");
+      } catch (photoError) {
+        toast.error(
+          photoError instanceof Error
+            ? photoError.message
+            : "Не удалось загрузить фотографии",
+        );
+      } finally {
+        setSavingPhotos(false);
+      }
+    },
+    [patchTask, selectedTask, upsertTask],
+  );
+
+  const handleRemoveTaskPhoto = useCallback(
+    async (index: number) => {
+      if (!selectedTask) {
+        return;
+      }
+
+      const nextPhotos = selectedTask.photos.filter((_, photoIndex) => photoIndex !== index);
+      setSavingPhotos(true);
+
+      try {
+        const updatedTask = await patchTask(selectedTask.id, { photos: nextPhotos });
+        upsertTask(updatedTask);
+      } catch (removeError) {
+        toast.error(
+          removeError instanceof Error
+            ? removeError.message
+            : "Не удалось удалить фотографию",
+        );
+      } finally {
+        setSavingPhotos(false);
+      }
+    },
+    [patchTask, selectedTask, upsertTask],
+  );
+
+  const handleAddComment = useCallback(async () => {
+    if (!selectedTask) {
+      return;
+    }
+
+    const text = commentDraft.trim();
+
+    if (!text) {
+      return;
+    }
+
+    setPostingComment(true);
+
+    try {
+      const res = await fetch(`/api/tasks/${selectedTask.id}/comments`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ body: text }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Не удалось отправить комментарий");
+      }
+
+      setTaskComments((current) => [...current, data.comment as TaskCommentItem]);
+      setCommentDraft("");
+      toast.success("Комментарий добавлен");
+    } catch (commentError) {
+      toast.error(
+        commentError instanceof Error
+          ? commentError.message
+          : "Не удалось отправить комментарий",
+      );
+    } finally {
+      setPostingComment(false);
+    }
+  }, [commentDraft, selectedTask]);
+
   const handleCreateTeam = async () => {
     setSavingTeam(true);
 
@@ -387,7 +755,11 @@ export default function TasksPage() {
 
       toast.success("Команда создана");
       setIsCreateTeamOpen(false);
-      setTeamForm({ name: "", color: TEAM_COLOR_OPTIONS[0] });
+      setTeamForm({
+        name: "",
+        color: TEAM_COLOR_OPTIONS[0],
+        pmId: teamManagers[0]?.id ?? "",
+      });
       setTaskForm((current) => ({
         ...current,
         teamId: current.teamId || result.team.id,
@@ -428,7 +800,7 @@ export default function TasksPage() {
       toast.success(editingTask ? "Задача обновлена" : "Задача создана");
       setIsTaskModalOpen(false);
       setEditingTask(null);
-      setTaskForm(getEmptyTaskForm(teams[0]?.id));
+      setTaskForm(createEmptyTaskForm(teams[0]?.id));
       window.dispatchEvent(new Event("taska:workspace-updated"));
     } catch (taskError) {
       toast.error(
@@ -442,6 +814,8 @@ export default function TasksPage() {
   };
 
   const handleEditTask = (task: TaskItem) => {
+    setIsTaskDrawerOpen(false);
+    setSelectedTaskId(null);
     setEditingTask(task);
     setTaskForm({
       title: task.title,
@@ -451,6 +825,7 @@ export default function TasksPage() {
       specialization: task.specialization ?? "",
       teamId: task.team.id,
       assigneeId: task.assignee?.id ?? "",
+      photos: task.photos ?? [],
     });
     setIsTaskModalOpen(true);
   };
@@ -476,6 +851,10 @@ export default function TasksPage() {
       }
 
       toast.success("Задача удалена");
+      if (selectedTaskId === taskId) {
+        setIsTaskDrawerOpen(false);
+        setSelectedTaskId(null);
+      }
       window.dispatchEvent(new Event("taska:workspace-updated"));
     } catch (deleteError) {
       toast.error(
@@ -495,7 +874,7 @@ export default function TasksPage() {
     }
 
     setEditingTask(null);
-    setTaskForm(getEmptyTaskForm(teams[0]?.id));
+    setTaskForm(createEmptyTaskForm(teams[0]?.id));
     setIsTaskModalOpen(true);
   };
 
@@ -511,16 +890,45 @@ export default function TasksPage() {
 
   const renderTaskCard = (
     task: TaskItem,
-    options?: { compact?: boolean; actionMode?: "inline" | "dropdown" | "hidden" },
+    options?: {
+      compact?: boolean;
+      actionMode?: "inline" | "dropdown" | "hidden";
+      draggable?: boolean;
+      onDragStart?: (taskId: string) => void;
+      onDragEnd?: () => void;
+    },
   ) => {
     const compact = options?.compact ?? false;
     const actionMode = options?.actionMode ?? "inline";
+    const isDraggable = options?.draggable ?? false;
 
     return (
     <article
       key={task.id}
-      className={`rounded-3xl border border-border bg-background shadow-sm ${compact ? "p-3" : "p-4"
-        }`}
+      className={`rounded-3xl border border-border bg-background shadow-sm transition hover:border-primary/40 hover:shadow-md ${compact ? "p-3" : "p-4"
+        } ${isDraggable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"}`}
+      onClick={() => handleOpenTaskDrawer(task.id)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          handleOpenTaskDrawer(task.id);
+        }
+      }}
+      role="button"
+      tabIndex={0}
+      draggable={isDraggable}
+      onDragStart={(event) => {
+        if (!isDraggable) {
+          return;
+        }
+
+        event.dataTransfer.setData("text/plain", task.id);
+        event.dataTransfer.effectAllowed = "move";
+        options?.onDragStart?.(task.id);
+      }}
+      onDragEnd={() => {
+        options?.onDragEnd?.();
+      }}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
@@ -544,7 +952,10 @@ export default function TasksPage() {
         </div>
 
         {actionMode === "inline" ? (
-          <div className="flex items-center gap-1">
+          <div
+            className="flex items-center gap-1"
+            onClick={(event) => event.stopPropagation()}
+          >
             <Button
               isIconOnly
               size="sm"
@@ -569,36 +980,38 @@ export default function TasksPage() {
         ) : null}
 
         {actionMode === "dropdown" ? (
-          <Dropdown placement="bottom-end">
-            <DropdownTrigger>
-              <Button
-                isIconOnly
-                size="sm"
-                variant="light"
-                className="rounded-xl"
-              >
-                <MoreHorizontal size={16} />
-              </Button>
-            </DropdownTrigger>
-            <DropdownMenu aria-label={`Действия для задачи ${task.title}`}>
-              <DropdownItem
-                key="edit"
-                startContent={<PenSquare size={16} />}
-                onPress={() => handleEditTask(task)}
-              >
-                Редактировать
-              </DropdownItem>
-              <DropdownItem
-                key="delete"
-                color="danger"
-                className="text-danger"
-                startContent={<Trash2 size={16} />}
-                onPress={() => void handleDeleteTask(task.id)}
-              >
-                Удалить
-              </DropdownItem>
-            </DropdownMenu>
-          </Dropdown>
+          <div onClick={(event) => event.stopPropagation()}>
+            <Dropdown placement="bottom-end">
+              <DropdownTrigger>
+                <Button
+                  isIconOnly
+                  size="sm"
+                  variant="light"
+                  className="rounded-xl"
+                >
+                  <MoreHorizontal size={16} />
+                </Button>
+              </DropdownTrigger>
+              <DropdownMenu aria-label={`Действия для задачи ${task.title}`}>
+                <DropdownItem
+                  key="edit"
+                  startContent={<PenSquare size={16} />}
+                  onPress={() => handleEditTask(task)}
+                >
+                  Редактировать
+                </DropdownItem>
+                <DropdownItem
+                  key="delete"
+                  color="danger"
+                  className="text-danger"
+                  startContent={<Trash2 size={16} />}
+                  onPress={() => void handleDeleteTask(task.id)}
+                >
+                  Удалить
+                </DropdownItem>
+              </DropdownMenu>
+            </Dropdown>
+          </div>
         ) : null}
       </div>
 
@@ -638,26 +1051,7 @@ export default function TasksPage() {
       <div className="space-y-8 p-4 md:p-6 xl:p-8">
         <section className="rounded-[28px] border border-border bg-card p-6 shadow-sm">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-            <div>
-              <div className="flex items-center gap-2">
-                <Table size={18} className="text-primary" />
-                <h1 className="text-xl font-semibold tracking-tight">Мои задачи</h1>
-              </div>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-                Выбирайте удобный формат работы: список, канбан, scrum или
-                календарь. Все режимы работают с одним и тем же набором задач.
-              </p>
-            </div>
-
             <div className="flex flex-wrap gap-2">
-              <Button
-                variant="light"
-                className="rounded-xl"
-                startContent={<Users size={16} />}
-                onPress={() => setIsCreateTeamOpen(true)}
-              >
-                Новая команда
-              </Button>
               <Button
                 color="primary"
                 className="rounded-xl"
@@ -669,7 +1063,7 @@ export default function TasksPage() {
             </div>
           </div>
 
-          <div className="mt-6 grid gap-3 xl:grid-cols-[minmax(0,1.4fr)_220px_220px]">
+          <div className="mt-6 grid gap-3 xl:grid-cols-[minmax(0,1.3fr)_220px_220px_220px_auto]">
             <Input
               value={searchQuery}
               onValueChange={setSearchQuery}
@@ -680,31 +1074,71 @@ export default function TasksPage() {
               }}
             />
 
-            <select
-              className="h-11 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none transition focus:border-primary"
-              value={teamFilter}
+            <UnifiedSelect
+              aria-label="Фильтр по команде"
+              selectedKeys={[teamFilter]}
               onChange={(event) => setTeamFilter(event.target.value)}
+              items={[
+                { id: "all", label: "Все команды" },
+                ...teams.map((team) => ({ id: team.id, label: team.name })),
+              ]}
             >
-              <option value="all">Все команды</option>
-              {teams.map((team) => (
-                <option key={team.id} value={team.id}>
-                  {team.name}
-                </option>
-              ))}
-            </select>
+              {(item: { id: string; label: string }) => (
+                <UnifiedSelectItem key={item.id}>{item.label}</UnifiedSelectItem>
+              )}
+            </UnifiedSelect>
 
-            <select
-              className="h-11 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none transition focus:border-primary"
-              value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value as "ALL" | TaskStatus)}
+            <UnifiedSelect
+              aria-label="Фильтр по статусу"
+              selectedKeys={[statusFilter]}
+              onChange={(event) =>
+                setStatusFilter((event.target.value || "ALL") as "ALL" | TaskStatus)
+              }
+              items={[
+                { id: "ALL", label: "Все статусы" },
+                ...TASK_STATUSES.map((status) => ({
+                  id: status,
+                  label: TASK_STATUS_LABELS[status],
+                })),
+              ]}
             >
-              <option value="ALL">Все статусы</option>
-              {TASK_STATUSES.map((status) => (
-                <option key={status} value={status}>
-                  {TASK_STATUS_LABELS[status]}
-                </option>
-              ))}
-            </select>
+              {(item: { id: string; label: string }) => (
+                <UnifiedSelectItem key={item.id}>{item.label}</UnifiedSelectItem>
+              )}
+            </UnifiedSelect>
+
+            <UnifiedSelect
+              aria-label="Фильтр по специализации"
+              selectedKeys={[specializationFilter]}
+              onChange={(event) =>
+                setSpecializationFilter(
+                  (event.target.value || "ALL") as "ALL" | UserSpecialization,
+                )
+              }
+              items={[
+                { id: "ALL", label: "Все метки" },
+                ...USER_SPECIALIZATIONS.map((specialization) => ({
+                  id: specialization,
+                  label: USER_SPECIALIZATION_LABELS[specialization],
+                })),
+              ]}
+            >
+              {(item: { id: string; label: string }) => (
+                <UnifiedSelectItem key={item.id}>{item.label}</UnifiedSelectItem>
+              )}
+            </UnifiedSelect>
+
+            <div className="flex items-center px-1">
+              <Checkbox
+                isSelected={assignedToMeOnly}
+                onValueChange={setAssignedToMeOnly}
+                classNames={{
+                  label: "text-sm text-foreground",
+                }}
+              >
+                Назначенные мне
+              </Checkbox>
+            </div>
           </div>
 
           <div className="mt-4 flex flex-wrap gap-2">
@@ -790,6 +1224,8 @@ export default function TasksPage() {
                     setSearchQuery("");
                     setTeamFilter("all");
                     setStatusFilter("ALL");
+                    setSpecializationFilter("ALL");
+                    setAssignedToMeOnly(false);
                   }}
                 >
                   Сбросить фильтры
@@ -807,7 +1243,29 @@ export default function TasksPage() {
               {viewMode === "kanban" ? (
                 <div className="grid gap-4 xl:grid-cols-4">
                   {boardColumns.map((column) => (
-                    <div key={column.id} className="rounded-[26px] bg-muted p-4">
+                    <div
+                      key={column.id}
+                      className={`rounded-[26px] p-4 transition ${dragOverStatus === column.id ? "bg-primary/10 ring-1 ring-primary/40" : "bg-muted"
+                        }`}
+                      onDragOver={(event) => {
+                        event.preventDefault();
+                        setDragOverStatus(column.id);
+                      }}
+                      onDragLeave={(event) => {
+                        if (!event.currentTarget.contains(event.relatedTarget as Node)) {
+                          setDragOverStatus(null);
+                        }
+                      }}
+                      onDrop={(event) => {
+                        event.preventDefault();
+                        const taskId = event.dataTransfer.getData("text/plain");
+                        setDragOverStatus(null);
+
+                        if (taskId) {
+                          void handleTaskStatusDrop(taskId, column.id);
+                        }
+                      }}
+                    >
                       <div className="flex items-center justify-between gap-3">
                         <div>
                           <h3 className="font-semibold">{column.title}</h3>
@@ -823,11 +1281,25 @@ export default function TasksPage() {
                       <div className="mt-4 space-y-3">
                         {column.tasks.length > 0 ? (
                           column.tasks.map((task) =>
-                            renderTaskCard(task, { actionMode: "dropdown" }),
+                            renderTaskCard(task, {
+                              actionMode: "dropdown",
+                              draggable:
+                                canManageTasks || task.assignee?.id === currentUserId,
+                              onDragStart: (taskId) => setDraggingTaskId(taskId),
+                              onDragEnd: () => {
+                                setDraggingTaskId(null);
+                                setDragOverStatus(null);
+                              },
+                            }),
                           )
                         ) : (
-                          <div className="rounded-3xl border border-dashed border-border bg-background/70 p-4 text-sm text-muted-foreground">
-                            В этой колонке пока нет задач.
+                          <div
+                            className={`rounded-3xl border border-dashed p-4 text-sm text-muted-foreground ${draggingTaskId ? "border-primary/40 bg-primary/5" : "border-border bg-background/70"
+                              }`}
+                          >
+                            {draggingTaskId
+                              ? "Перетащите задачу в эту колонку"
+                              : "В этой колонке пока нет задач."}
                           </div>
                         )}
                       </div>
@@ -998,6 +1470,176 @@ export default function TasksPage() {
         </section>
       </div>
 
+      <Drawer
+        isOpen={isTaskDrawerOpen}
+        onOpenChange={(open) => {
+          setIsTaskDrawerOpen(open);
+          if (!open) {
+            setSelectedTaskId(null);
+          }
+        }}
+        placement="right"
+        size="lg"
+      >
+        <DrawerContent>
+          <DrawerHeader className="flex flex-col gap-2">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+              Детали задачи
+            </p>
+            <h3 className="text-lg font-semibold">
+              {selectedTask?.title ?? "Задача не найдена"}
+            </h3>
+          </DrawerHeader>
+          <DrawerBody>
+            {selectedTask ? (
+              <div className="space-y-5 pb-6">
+                <div className="rounded-2xl border border-border bg-background p-4">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Описание
+                  </p>
+                  <p className="mt-2 text-sm leading-6">
+                    {selectedTask.description || "Описание пока не добавлено"}
+                  </p>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-2xl border border-border bg-background p-4">
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                      Исполнитель
+                    </p>
+                    <p className="mt-2 text-sm font-medium">
+                      {selectedTask.assignee?.name || "Не назначен"}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-border bg-background p-4">
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                      Статус
+                    </p>
+                    <Chip variant="flat" className="mt-2 rounded-xl">
+                      {TASK_STATUS_LABELS[selectedTask.status]}
+                    </Chip>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-border bg-background p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                        Медиа
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Можно загрузить только фотографии (до 8 штук).
+                      </p>
+                    </div>
+
+                    <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-border px-3 py-2 text-sm transition hover:bg-muted">
+                      <ImagePlus size={16} />
+                      {savingPhotos ? "Сохраняем..." : "Добавить фото"}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        disabled={savingPhotos}
+                        onChange={(event) => {
+                          void handleTaskPhotoUpload(event.target.files);
+                          event.currentTarget.value = "";
+                        }}
+                      />
+                    </label>
+                  </div>
+
+                  <div className="mt-4">
+                    {selectedTask.photos.length > 0 ? (
+                      <div className="grid grid-cols-2 gap-3">
+                        {selectedTask.photos.map((photo, index) => (
+                          <div
+                            key={`${selectedTask.id}-photo-${index}`}
+                            className="group relative overflow-hidden rounded-xl border border-border"
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={photo}
+                              alt={`Фото задачи ${index + 1}`}
+                              className="h-28 w-full object-cover"
+                            />
+                            <button
+                              type="button"
+                              className="absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm transition hover:bg-danger hover:text-danger-foreground"
+                              onClick={() => void handleRemoveTaskPhoto(index)}
+                              disabled={savingPhotos}
+                              aria-label="Удалить фото"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="rounded-xl border border-dashed border-border bg-muted/30 p-4 text-sm text-muted-foreground">
+                        Фотографии пока не добавлены.
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-border bg-background p-4">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Комментарии
+                  </p>
+                  {commentsLoading ? (
+                    <p className="mt-3 text-sm text-muted-foreground">Загрузка комментариев...</p>
+                  ) : taskComments.length === 0 ? (
+                    <p className="mt-3 text-sm text-muted-foreground">Пока без комментариев.</p>
+                  ) : (
+                    <ul className="mt-3 max-h-64 space-y-3 overflow-y-auto pr-1">
+                      {taskComments.map((comment) => (
+                        <li
+                          key={comment.id}
+                          className="rounded-xl bg-muted px-3 py-2.5 text-sm"
+                        >
+                          <p className="text-xs text-muted-foreground">
+                            {comment.user.name || comment.user.email || "Пользователь"} ·{" "}
+                            {formatCommentAt(comment.createdAt)}
+                          </p>
+                          <p className="mt-1 whitespace-pre-wrap leading-6">{comment.body}</p>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+
+                  <div className="mt-4 space-y-2">
+                    <Textarea
+                      placeholder="Написать комментарий..."
+                      value={commentDraft}
+                      onValueChange={setCommentDraft}
+                      minRows={2}
+                      classNames={{
+                        inputWrapper:
+                          "rounded-xl border border-border bg-background shadow-none",
+                      }}
+                    />
+                    <Button
+                      color="primary"
+                      className="rounded-xl"
+                      isLoading={postingComment}
+                      isDisabled={!commentDraft.trim()}
+                      onPress={() => void handleAddComment()}
+                    >
+                      Отправить
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Выберите задачу, чтобы посмотреть детали.
+              </p>
+            )}
+          </DrawerBody>
+        </DrawerContent>
+      </Drawer>
+
       <Modal isOpen={isCreateTeamOpen} onOpenChange={setIsCreateTeamOpen}>
         <ModalContent className="rounded-[28px]">
           {(onClose) => (
@@ -1034,6 +1676,26 @@ export default function TasksPage() {
                     ))}
                   </div>
                 </div>
+
+                <div>
+                  <p className="mb-2 text-sm font-medium">PM команды</p>
+                  <UnifiedSelect
+                    selectedKeys={teamForm.pmId ? [teamForm.pmId] : []}
+                    onChange={(event) =>
+                      setTeamForm((current) => ({
+                        ...current,
+                        pmId: event.target.value,
+                      }))
+                    }
+                    placeholder="Выберите PM"
+                  >
+                    {teamManagers.map((manager) => (
+                      <UnifiedSelectItem key={manager.id}>
+                        {manager.name || manager.email || "Без имени"}
+                      </UnifiedSelectItem>
+                    ))}
+                  </UnifiedSelect>
+                </div>
               </ModalBody>
               <ModalFooter>
                 <Button variant="light" className="rounded-xl" onPress={onClose}>
@@ -1043,6 +1705,7 @@ export default function TasksPage() {
                   color="primary"
                   className="rounded-xl"
                   isLoading={savingTeam}
+                  isDisabled={!teamForm.pmId}
                   onPress={() => void handleCreateTeam()}
                 >
                   Создать команду
@@ -1053,198 +1716,17 @@ export default function TasksPage() {
         </ModalContent>
       </Modal>
 
-      <Modal isOpen={isTaskModalOpen} onOpenChange={setIsTaskModalOpen}>
-        <ModalContent className="rounded-[28px]">
-          {(onClose) => (
-            <>
-              <ModalHeader>
-                {editingTask ? "Редактировать задачу" : "Новая задача"}
-              </ModalHeader>
-              <ModalBody className="space-y-4 pb-2">
-                <Input
-                  label="Название"
-                  labelPlacement="outside"
-                  placeholder="Что нужно сделать?"
-                  value={taskForm.title}
-                  onValueChange={(value) =>
-                    setTaskForm((current) => ({ ...current, title: value }))
-                  }
-                />
-
-                <div>
-                  <p className="mb-2 text-sm font-medium">Описание</p>
-                  <Textarea
-                    placeholder="Коротко опишите задачу"
-                    value={taskForm.description}
-                    onValueChange={(value) =>
-                      setTaskForm((current) => ({
-                        ...current,
-                        description: value,
-                      }))
-                    }
-                  />
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-3">
-                  <div>
-                    <p className="mb-2 text-sm font-medium">Команда</p>
-                    <Select
-                      className="h-11 w-full rounded-xl border border-border px-3 text-sm outline-none transition focus:border-primary"
-                      value={taskForm.teamId}
-                      onChange={(event) =>
-                        setTaskForm((current) => ({
-                          ...current,
-                          teamId: event.target.value,
-                        }))
-                      }
-                    >
-                      {teams.map((team) => (
-                        <SelectItem key={team.id}>{team.name}</SelectItem>
-                      ))}
-                    </Select>
-                  </div>
-
-                  <div>
-                    <p className="mb-2 text-sm font-medium">Статус</p>
-                    <Select
-                      className="h-11 w-full rounded-xl border border-border px-3 text-sm outline-none transition focus:border-primary"
-                      value={taskForm.status}
-                      onChange={(event) =>
-                        setTaskForm((current) => ({
-                          ...current,
-                          status: event.target.value as TaskStatus,
-                        }))
-                      }
-                    >
-                      {TASK_STATUSES.map((status) => (
-                        <SelectItem key={status}>{TASK_STATUS_LABELS[status] as TaskStatus}</SelectItem>
-                      ))}
-                    </Select>
-                  </div>
-
-                  <div>
-                    <p className="mb-2 text-sm font-medium">Приоритет</p>
-                    <Select
-                      className="h-11 w-full rounded-xl border border-border px-3 text-sm outline-none transition focus:border-primary"
-                      value={taskForm.priority}
-                      onChange={(event) =>
-                        setTaskForm((current) => ({
-                          ...current,
-                          priority: event.target.value as TaskPriority,
-                        }))
-                      }
-                    >
-                      {TASK_PRIORITIES.map((priority) => (
-                        <SelectItem key={priority}>{TASK_PRIORITY_LABELS[priority as TaskPriority]}</SelectItem>
-                      ))}
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div>
-                    <p className="mb-2 text-sm font-medium">Метка задачи</p>
-                    <Select
-                      className="h-11 w-full rounded-xl border border-border px-3 text-sm outline-none transition focus:border-primary"
-                      value={taskForm.specialization}
-                      placeholder="Выберите специализацию"
-                      onChange={(event) => {
-                        const nextSpecialization = event.target.value as
-                          | UserSpecialization
-                          | "";
-
-                        setTaskForm((current) => {
-                          const nextAssignee = taskAssignees.find(
-                            (assignee: TaskAssigneeItem) =>
-                              assignee.id === current.assigneeId,
-                          );
-
-                          return {
-                            ...current,
-                            specialization: nextSpecialization,
-                            assigneeId:
-                              nextAssignee?.specialization === nextSpecialization
-                                ? current.assigneeId
-                                : "",
-                          };
-                        });
-                      }}
-                    >
-                      {USER_SPECIALIZATIONS.map((specialization) => (
-                        <SelectItem key={specialization}>
-                          {USER_SPECIALIZATION_LABELS[specialization]}
-                        </SelectItem>
-                      ))}
-                    </Select>
-                  </div>
-
-                  <div>
-                    <p className="mb-2 text-sm font-medium">Исполнитель</p>
-                    <Select
-                      className="h-11 w-full rounded-xl border border-border px-3 text-sm outline-none transition focus:border-primary"
-                      value={taskForm.assigneeId}
-                      placeholder={
-                        taskForm.specialization
-                          ? "Выберите исполнителя"
-                          : "Сначала выберите метку"
-                      }
-                      isDisabled={!taskForm.specialization}
-                      onChange={(event) =>
-                        setTaskForm((current) => ({
-                          ...current,
-                          assigneeId: event.target.value,
-                        }))
-                      }
-                    >
-                      {compatibleAssignees.map((assignee: TaskAssigneeItem) => (
-                        <SelectItem key={assignee.id}>
-                          {assignee.name || assignee.email || "Без имени"}
-                        </SelectItem>
-                      ))}
-                    </Select>
-                    {taskForm.specialization ? (
-                      <p className="mt-2 text-xs text-muted-foreground">
-                        Доступны только пользователи с меткой{" "}
-                        {USER_SPECIALIZATION_LABELS[
-                          taskForm.specialization as UserSpecialization
-                        ]}
-                        .
-                      </p>
-                    ) : null}
-                    {taskForm.assigneeId ? (
-                      <Button
-                        variant="light"
-                        className="mt-2 h-8 rounded-xl px-3 text-xs"
-                        onPress={() =>
-                          setTaskForm((current) => ({
-                            ...current,
-                            assigneeId: "",
-                          }))
-                        }
-                      >
-                        Снять исполнителя
-                      </Button>
-                    ) : null}
-                  </div>
-                </div>
-              </ModalBody>
-              <ModalFooter>
-                <Button variant="light" className="rounded-xl" onPress={onClose}>
-                  Отмена
-                </Button>
-                <Button
-                  color="primary"
-                  className="rounded-xl"
-                  isLoading={savingTask}
-                  onPress={() => void handleCreateTask()}
-                >
-                  {editingTask ? "Сохранить изменения" : "Создать задачу"}
-                </Button>
-              </ModalFooter>
-            </>
-          )}
-        </ModalContent>
-      </Modal>
+      <TaskEditorModal
+        isOpen={isTaskModalOpen}
+        onOpenChange={setIsTaskModalOpen}
+        isEditing={Boolean(editingTask)}
+        taskForm={taskForm}
+        setTaskForm={setTaskForm}
+        teams={teams.map((team) => ({ id: team.id, name: team.name }))}
+        taskAssignees={taskAssignees}
+        isSaving={savingTask}
+        onSubmit={handleCreateTask}
+      />
     </>
   );
 }

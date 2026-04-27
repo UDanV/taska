@@ -34,6 +34,7 @@ function getTaskScope(userId: string, role: string) {
 async function validateAssignee(
   assigneeId: string | null,
   specialization: string,
+  teamId: string,
 ) {
   if (!assigneeId) {
     return { assigneeId: null };
@@ -65,6 +66,25 @@ async function validateAssignee(
     };
   }
 
+  const membership = await prisma.teamMember.findUnique({
+    where: {
+      teamId_userId: {
+        teamId,
+        userId: assignee.id,
+      },
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!membership) {
+    return {
+      error: "Исполнитель не состоит в выбранной команде",
+      status: 400 as const,
+    };
+  }
+
   return { assigneeId: assignee.id };
 }
 
@@ -82,6 +102,7 @@ export async function GET() {
       id: true,
       title: true,
       description: true,
+      photos: true,
       status: true,
       priority: true,
       specialization: true,
@@ -159,6 +180,7 @@ export async function POST(req: Request) {
     const assigneeValidation = await validateAssignee(
       data.assigneeId,
       data.specialization,
+      data.teamId,
     );
 
     if ("error" in assigneeValidation) {
@@ -172,6 +194,7 @@ export async function POST(req: Request) {
       data: {
         title: data.title,
         description: data.description,
+        photos: data.photos,
         status: data.status,
         priority: data.priority,
         specialization: data.specialization,
@@ -183,6 +206,7 @@ export async function POST(req: Request) {
         id: true,
         title: true,
         description: true,
+        photos: true,
         status: true,
         priority: true,
         specialization: true,

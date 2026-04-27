@@ -7,7 +7,6 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import type { AppRole, UserSpecialization } from "@/app/lib/auth/roles";
 import {
-  ROLE_DESCRIPTIONS,
   ROLE_LABELS,
   USER_SPECIALIZATION_LABELS,
 } from "@/app/lib/auth/roles";
@@ -38,7 +37,6 @@ export default function ProfileContent({ user }: ProfileContentProps) {
     },
   });
   const roleLabel = ROLE_LABELS[user.role];
-  const roleDescription = ROLE_DESCRIPTIONS[user.role];
   const specializationLabel = user.specialization
     ? USER_SPECIALIZATION_LABELS[user.specialization]
     : null;
@@ -58,18 +56,8 @@ export default function ProfileContent({ user }: ProfileContentProps) {
 
   return (
     <div className="space-y-8 p-4 md:p-6 xl:p-8">
-      <section className="rounded-[28px] border border-border bg-card p-6 shadow-sm">
-        <p className="text-sm text-muted-foreground">Профиль</p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight">
-          Аккаунт и безопасность
-        </h1>
-        <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
-          Здесь собрана базовая информация о пользователе, его реальная роль в
-          системе и настройки безопасности аккаунта.
-        </p>
-      </section>
 
-      <section className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
+      <section className="grid gap-4 xl:grid-cols-1">
         <div className="space-y-4">
           <section className="rounded-[28px] border border-border bg-card p-6 shadow-sm">
             <div className="flex items-center gap-2">
@@ -79,12 +67,8 @@ export default function ProfileContent({ user }: ProfileContentProps) {
 
             <div className="mt-6 flex flex-col gap-5 lg:flex-row lg:items-center">
               <Avatar
-                src={user.image ?? undefined}
                 name={user.name || user.email || "Taska"}
-                className="h-20 w-20 bg-primary text-xl font-semibold text-primary-foreground"
-                classNames={{
-                  name: "text-xl font-semibold text-primary-foreground",
-                }}
+                className="h-20 w-20 bg-primary font-semibold text-primary-foreground"
               />
 
               <div className="space-y-2">
@@ -107,20 +91,6 @@ export default function ProfileContent({ user }: ProfileContentProps) {
                   </Chip>
                 </div>
               </div>
-            </div>
-          </section>
-
-          <section className="rounded-[28px] border border-border bg-card p-6 shadow-sm">
-            <div className="flex items-center gap-2">
-              <BadgeCheck size={18} className="text-primary" />
-              <h2 className="text-lg font-semibold">Роль пользователя</h2>
-            </div>
-
-            <div className="mt-5 rounded-3xl bg-muted p-4">
-              <p className="font-medium">{roleLabel}</p>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                {roleDescription}
-              </p>
             </div>
           </section>
 

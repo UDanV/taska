@@ -11,10 +11,7 @@ export async function GET() {
   }
 
   if (!hasCapability(user.role, "canManageTasks")) {
-    return NextResponse.json(
-      { error: "Назначение исполнителей недоступно" },
-      { status: 403 },
-    );
+    return NextResponse.json({ users: [] });
   }
 
   const users = await prisma.user.findMany({
@@ -30,8 +27,22 @@ export async function GET() {
       email: true,
       role: true,
       specialization: true,
+      teamMembers: {
+        select: {
+          teamId: true,
+        },
+      },
     },
   });
 
-  return NextResponse.json({ users });
+  return NextResponse.json({
+    users: users.map((item) => ({
+      id: item.id,
+      name: item.name,
+      email: item.email,
+      role: item.role,
+      specialization: item.specialization,
+      teamIds: item.teamMembers.map((membership) => membership.teamId),
+    })),
+  });
 }

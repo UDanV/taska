@@ -25,6 +25,8 @@ export const LoadingIcon: FC<IconSvgProps> = ({
   </svg>
 );
 
+const LOGO_ICON_GRADIENT_ID = "taska-logo-icon-accent";
+
 export const LogoIcon: FC<IconSvgProps> = ({
   size = 65,
   width,
@@ -39,59 +41,23 @@ export const LogoIcon: FC<IconSvgProps> = ({
     fill="none"
     {...props}
   >
-    <circle cx="35" cy="41" r="35" fill="url(#paint0_linear_1_6)" />
+    <circle cx="35" cy="41" r="35" fill={`url(#${LOGO_ICON_GRADIENT_ID})`} />
     <path
       d="M42.328 25.136L36.184 62H26.712L32.856 25.136H19.928L21.208 17.328H56.536L55.256 25.136H42.328Z"
       fill="white"
     />
     <defs>
       <linearGradient
-        id="paint0_linear_1_6"
+        id={LOGO_ICON_GRADIENT_ID}
         x1="15.5"
         y1="12"
         x2="60"
         y2="65"
         gradientUnits="userSpaceOnUse"
       >
-        <stop stopColor="#AA79FF" />
-        <stop offset="0.5" stopColor="#0033FF" stopOpacity="0" />
-        <stop offset="1" stopColor="#AA79FF" />
-      </linearGradient>
-    </defs>
-  </svg>
-);
-
-export const LogoDarkIcon: FC<IconSvgProps> = ({
-  size = 65,
-  width,
-  height,
-  ...props
-}) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width={width || size}
-    height={height || size}
-    viewBox="0 0 70 83"
-    fill="none"
-    {...props}
-  >
-    <circle cx="35" cy="41" r="35" fill="url(#paint0_linear_1_6)" />
-    <path
-      d="M42.328 25.136L36.184 62H26.712L32.856 25.136H19.928L21.208 17.328H56.536L55.256 25.136H42.328Z"
-      fill="black"
-    />
-    <defs>
-      <linearGradient
-        id="paint0_linear_1_6"
-        x1="15.5"
-        y1="12"
-        x2="60"
-        y2="65"
-        gradientUnits="userSpaceOnUse"
-      >
-        <stop stopColor="#AA79FF" />
-        <stop offset="0.5" stopColor="#0033FF" stopOpacity="0" />
-        <stop offset="1" stopColor="#AA79FF" />
+        <stop stopColor="var(--primary)" />
+        <stop offset="0.5" stopColor="var(--primary)" stopOpacity="0" />
+        <stop offset="1" stopColor="var(--primary-highlight)" />
       </linearGradient>
     </defs>
   </svg>

@@ -37,6 +37,7 @@ function getTaskScope(userId: string, role: string, taskId: string) {
 async function validateAssignee(
   assigneeId: string | null,
   specialization: string | null,
+  teamId: string,
 ) {
   if (!assigneeId) {
     return { assigneeId: null };
@@ -75,6 +76,25 @@ async function validateAssignee(
     };
   }
 
+  const membership = await prisma.teamMember.findUnique({
+    where: {
+      teamId_userId: {
+        teamId,
+        userId: assignee.id,
+      },
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!membership) {
+    return {
+      error: "Исполнитель не состоит в выбранной команде",
+      status: 400 as const,
+    };
+  }
+
   return { assigneeId: assignee.id };
 }
 
@@ -86,13 +106,6 @@ export async function PATCH(
 
   if (!user?.id) {
     return NextResponse.json({ error: "Требуется авторизация" }, { status: 401 });
-  }
-
-  if (!hasCapability(user.role, "canManageTasks")) {
-    return NextResponse.json(
-      { error: "Недостаточно прав для редактирования задач" },
-      { status: 403 },
-    );
   }
 
   const { taskId } = await params;
@@ -107,11 +120,44 @@ export async function PATCH(
         id: true,
         specialization: true,
         assigneeId: true,
+        teamId: true,
       },
     });
 
     if (!existingTask) {
       return NextResponse.json({ error: "Задача не найдена" }, { status: 404 });
+    }
+
+    const canManageTasks = hasCapability(user.role, "canManageTasks");
+
+    if (!canManageTasks) {
+      if (existingTask.assigneeId !== user.id) {
+        return NextResponse.json(
+          { error: "Недостаточно прав для редактирования задачи" },
+          { status: 403 },
+        );
+      }
+
+      const providedFields = Object.keys(data);
+      const isOnlyStatusUpdate =
+        providedFields.length === 1 && providedFields[0] === "status";
+
+      if (!isOnlyStatusUpdate || !data.status) {
+        return NextResponse.json(
+          {
+            error:
+              "Исполнитель может менять только статус задачи на 'На проверке' или 'Готово'",
+          },
+          { status: 403 },
+        );
+      }
+
+      if (data.status !== "REVIEW" && data.status !== "DONE") {
+        return NextResponse.json(
+          { error: "Исполнитель может перевести задачу только в 'На проверке' или 'Готово'" },
+          { status: 403 },
+        );
+      }
     }
 
     if (data.teamId) {
@@ -141,12 +187,14 @@ export async function PATCH(
     }
 
     const nextSpecialization = data.specialization ?? existingTask.specialization;
+    const nextTeamId = data.teamId ?? existingTask.teamId;
     const nextAssigneeId =
       data.assigneeId !== undefined ? data.assigneeId : existingTask.assigneeId;
 
     const assigneeValidation = await validateAssignee(
       nextAssigneeId,
       nextSpecialization,
+      nextTeamId,
     );
 
     if ("error" in assigneeValidation) {
@@ -168,6 +216,7 @@ export async function PATCH(
         id: true,
         title: true,
         description: true,
+        photos: true,
         status: true,
         priority: true,
         specialization: true,

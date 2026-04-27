@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Avatar, Button, Chip, Input, Select, SelectItem } from "@heroui/react";
-import { LoaderCircle, RefreshCcw, Search, ShieldCheck, UsersRound } from "lucide-react";
+import { LoaderCircle, Search, ShieldCheck, UsersRound } from "lucide-react";
 import { toast } from "sonner";
 import {
   APP_ROLES,
@@ -30,8 +30,10 @@ type UserDraft = {
   specialization: UserSpecialization | null;
 };
 
-const selectClassName =
-  "h-11 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none transition focus:border-primary";
+const selectClassNames = {
+  trigger:
+    "h-11 rounded-xl border border-border bg-background px-3 text-sm shadow-none",
+} as const;
 
 function formatCreatedAt(value: string) {
   return new Intl.DateTimeFormat("ru-RU", {
@@ -330,7 +332,7 @@ export default function UsersManagementPage() {
 
                       <div className="grid gap-3 lg:min-w-[360px] lg:grid-cols-[1fr_1fr_auto]">
                         <Select
-                          className={selectClassName}
+                          classNames={selectClassNames}
                           value={draft.role}
                           onChange={(event) =>
                             handleDraftChange(
@@ -348,7 +350,7 @@ export default function UsersManagementPage() {
                         </Select>
 
                         <Select
-                          className={selectClassName}
+                          classNames={selectClassNames}
                           value={draft.specialization ?? ""}
                           onChange={(event) =>
                             handleDraftChange(
