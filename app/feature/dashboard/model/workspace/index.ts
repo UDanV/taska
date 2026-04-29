@@ -14,8 +14,16 @@ import {
   TASKS_WORKSPACE_QUERY_KEY,
 } from "@/app/feature/tasks/model/workspace/query-keys";
 import type {
+  DashboardTaskAssigneeItem,
   DashboardTaskItem,
+  DashboardTeamManagerItem,
+  DashboardTeamItem,
 } from "../types";
+
+const EMPTY_TEAMS: DashboardTeamItem[] = [];
+const EMPTY_TASKS: DashboardTaskItem[] = [];
+const EMPTY_TASK_ASSIGNEES: DashboardTaskAssigneeItem[] = [];
+const EMPTY_TEAM_MANAGERS: DashboardTeamManagerItem[] = [];
 
 export function useDashboardWorkspace() {
   const queryClient = useQueryClient();
@@ -52,10 +60,10 @@ export function useDashboardWorkspace() {
         : postTask(taskForm),
   });
 
-  const teams = workspaceQuery.data?.teams ?? [];
-  const tasks = workspaceQuery.data?.tasks ?? [];
-  const taskAssignees = workspaceQuery.data?.taskAssignees ?? [];
-  const teamManagers = teamManagersQuery.data ?? [];
+  const teams = workspaceQuery.data?.teams ?? EMPTY_TEAMS;
+  const tasks = workspaceQuery.data?.tasks ?? EMPTY_TASKS;
+  const taskAssignees = workspaceQuery.data?.taskAssignees ?? EMPTY_TASK_ASSIGNEES;
+  const teamManagers = teamManagersQuery.data ?? EMPTY_TEAM_MANAGERS;
   const loading = workspaceQuery.isPending;
   const error = workspaceQuery.error instanceof Error ? workspaceQuery.error.message : null;
   const savingTeam = createTeamMutation.isPending;
@@ -64,13 +72,6 @@ export function useDashboardWorkspace() {
   const loadWorkspace = useCallback(async () => {
     await Promise.all([workspaceQuery.refetch(), teamManagersQuery.refetch()]);
   }, [teamManagersQuery, workspaceQuery]);
-
-  useEffect(() => {
-    setTeamForm((current) => ({
-      ...current,
-      pmId: current.pmId || teamManagers[0]?.id || "",
-    }));
-  }, [teamManagers]);
 
   const openTeamModal = useCallback(() => {
     setTeamForm({
