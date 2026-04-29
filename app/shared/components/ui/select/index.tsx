@@ -3,11 +3,11 @@
 import type { ComponentProps, ReactNode } from "react";
 import { Select, SelectItem } from "@heroui/react";
 
-type UnifiedSelectProps = Omit<ComponentProps<typeof Select>, "children"> & {
+type SelectUIProps = Omit<ComponentProps<typeof Select>, "children"> & {
   children?: ReactNode;
 };
 
-export function UnifiedSelect({ classNames, ...props }: UnifiedSelectProps) {
+export function SelectUI({ classNames, ...props }: SelectUIProps) {
   return (
     <Select
       classNames={{
@@ -19,4 +19,4 @@ export function UnifiedSelect({ classNames, ...props }: UnifiedSelectProps) {
   );
 }
 
-export const UnifiedSelectItem = SelectItem;
+export const SelectItemUI = SelectItem;

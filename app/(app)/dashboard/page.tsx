@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
 import {
   Calendar,
   ChartBar,
@@ -15,299 +14,21 @@ import {
   Users,
 } from "lucide-react";
 import { Button } from "@heroui/button";
-import { Chip, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from "@heroui/react";
-import { toast } from "sonner";
-import {
-  type UserSpecialization,
-} from "@/app/lib/auth/roles";
+import { Chip } from "@heroui/react";
 import { useDashboardPreferences } from "@/app/shared/providers/dashboard-preferences";
 import {
   TASK_PRIORITY_COLORS,
   TASK_PRIORITY_LABELS,
-  TEAM_COLOR_OPTIONS,
-  type TaskPriority,
-  type TaskStatus,
 } from "@/app/lib/workspace/constants";
-import TaskEditorModal, {
-  createEmptyTaskForm,
-  type TaskModalAssigneeItem,
-  type TaskModalFormState,
-} from "@/app/feature/tasks/task-editor-modal";
-import { UnifiedSelect, UnifiedSelectItem } from "@/app/feature/tasks/ui/unified-select";
-
-type TeamColor = (typeof TEAM_COLOR_OPTIONS)[number];
-
-type TeamItem = {
-  id: string;
-  name: string;
-  color: string;
-  membersCount: number;
-  tasksCount: number;
-};
-
-type TeamManagerItem = {
-  id: string;
-  name: string | null;
-  email: string | null;
-  role: "ROOT" | "PM" | "EMPLOYEE";
-};
-
-type TaskItem = {
-  id: string;
-  title: string;
-  description: string | null;
-  status: TaskStatus;
-  priority: TaskPriority;
-  specialization: UserSpecialization | null;
-  updatedAt: string;
-  team: {
-    id: string;
-    name: string;
-    color: string;
-  };
-  createdBy: {
-    id: string;
-    name: string | null;
-  };
-  assignee: {
-    id: string;
-    name: string | null;
-    specialization: UserSpecialization | null;
-  } | null;
-};
-
-type TaskAssigneeItem = TaskModalAssigneeItem;
-
-type TaskFormState = TaskModalFormState;
+import CreateTeamModal from "@/app/feature/tasks/ui/modals/create-team";
+import TaskEditorModal from "@/app/feature/tasks/ui/modals/task-editor";
+import { useDashboardWorkspace } from "@/app/feature/dashboard/model/workspace";
+import TaskStatusChart from "@/app/feature/dashboard/ui/charts/task-status";
 
 export default function DashboardPage() {
   const { visibleSections } = useDashboardPreferences();
   const hasVisibleSections = Object.values(visibleSections).some(Boolean);
-
-  const [teams, setTeams] = useState<TeamItem[]>([]);
-  const [tasks, setTasks] = useState<TaskItem[]>([]);
-  const [taskAssignees, setTaskAssignees] = useState<TaskAssigneeItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const [isCreateTeamOpen, setIsCreateTeamOpen] = useState(false);
-  const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
-  const [editingTask, setEditingTask] = useState<TaskItem | null>(null);
-
-  const [teamManagers, setTeamManagers] = useState<TeamManagerItem[]>([]);
-  const [teamForm, setTeamForm] = useState<{
-    name: string;
-    color: TeamColor;
-    pmId: string;
-  }>({
-    name: "",
-    color: TEAM_COLOR_OPTIONS[0],
-    pmId: "",
-  });
-  const [taskForm, setTaskForm] = useState<TaskFormState>(createEmptyTaskForm());
-  const [savingTeam, setSavingTeam] = useState(false);
-  const [savingTask, setSavingTask] = useState(false);
-
-  const loadWorkspace = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const [teamsRes, tasksRes, assigneesRes] = await Promise.all([
-        fetch("/api/teams", { cache: "no-store" }),
-        fetch("/api/tasks", { cache: "no-store" }),
-        fetch("/api/task-assignees", { cache: "no-store" }),
-      ]);
-
-      const teamsData = await teamsRes.json();
-      const tasksData = await tasksRes.json();
-      const assigneesData = await assigneesRes.json();
-
-      if (!teamsRes.ok) {
-        throw new Error(teamsData.error || "Не удалось загрузить команды");
-      }
-
-      if (!tasksRes.ok) {
-        throw new Error(tasksData.error || "Не удалось загрузить задачи");
-      }
-
-      if (!assigneesRes.ok) {
-        throw new Error(assigneesData.error || "Не удалось загрузить исполнителей");
-      }
-
-      setTeams(teamsData.teams ?? []);
-      setTasks(tasksData.tasks ?? []);
-      setTaskAssignees(assigneesData.users ?? []);
-    } catch (loadError) {
-      setError(
-        loadError instanceof Error
-          ? loadError.message
-          : "Не удалось загрузить рабочее пространство",
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const loadTeamManagers = useCallback(async () => {
-    try {
-      const res = await fetch("/api/team-managers", { cache: "no-store" });
-      const data = await res.json();
-
-      if (!res.ok) {
-        setTeamManagers([]);
-        return;
-      }
-
-      const managers = data.managers ?? [];
-      setTeamManagers(managers);
-      setTeamForm((current) => ({
-        ...current,
-        pmId: current.pmId || managers[0]?.id || "",
-      }));
-    } catch {
-      setTeamManagers([]);
-    }
-  }, []);
-
-  useEffect(() => {
-    void loadWorkspace();
-  }, [loadWorkspace]);
-
-  useEffect(() => {
-    void loadTeamManagers();
-  }, [loadTeamManagers]);
-
-  useEffect(() => {
-    const openTeamModal = () => {
-      setTeamForm({
-        name: "",
-        color: TEAM_COLOR_OPTIONS[0],
-        pmId: teamManagers[0]?.id ?? "",
-      });
-      setIsCreateTeamOpen(true);
-    };
-
-    const openTaskModal = () => {
-      if (teams.length === 0) {
-        openTeamModal();
-        return;
-      }
-
-      setEditingTask(null);
-      setTaskForm(createEmptyTaskForm(teams[0]?.id));
-      setIsTaskModalOpen(true);
-    };
-
-    const refreshWorkspace = () => {
-      void loadWorkspace();
-    };
-
-    window.addEventListener("taska:create-team", openTeamModal);
-    window.addEventListener("taska:create-task", openTaskModal);
-    window.addEventListener("taska:workspace-updated", refreshWorkspace);
-
-    return () => {
-      window.removeEventListener("taska:create-team", openTeamModal);
-      window.removeEventListener("taska:create-task", openTaskModal);
-      window.removeEventListener("taska:workspace-updated", refreshWorkspace);
-    };
-  }, [loadWorkspace, teamManagers, teams]);
-
-  const activeTasks = tasks.filter((task) => task.status !== "DONE");
-  const reviewTasksCount = tasks.filter((task) => task.status === "REVIEW").length;
-  const doneTasksCount = tasks.filter((task) => task.status === "DONE").length;
-  const highPriorityCount = tasks.filter((task) => task.priority === "HIGH").length;
-  const focusTasks = activeTasks.slice(0, 3);
-
-  const handleCreateTeam = async () => {
-    setSavingTeam(true);
-
-    try {
-      const res = await fetch("/api/teams", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(teamForm),
-      });
-
-      const result = await res.json();
-
-      if (!res.ok) {
-        throw new Error(result.error || "Не удалось создать команду");
-      }
-
-      toast.success("Команда создана");
-      setIsCreateTeamOpen(false);
-      setTeamForm({
-        name: "",
-        color: TEAM_COLOR_OPTIONS[0],
-        pmId: teamManagers[0]?.id ?? "",
-      });
-      setTaskForm((current) => ({
-        ...current,
-        teamId: current.teamId || result.team.id,
-      }));
-      window.dispatchEvent(new Event("taska:workspace-updated"));
-    } catch (teamError) {
-      toast.error(
-        teamError instanceof Error
-          ? teamError.message
-          : "Не удалось создать команду",
-      );
-    } finally {
-      setSavingTeam(false);
-    }
-  };
-
-  const handleCreateTask = async () => {
-    setSavingTask(true);
-
-    try {
-      const endpoint = editingTask ? `/api/tasks/${editingTask.id}` : "/api/tasks";
-      const method = editingTask ? "PATCH" : "POST";
-
-      const res = await fetch(endpoint, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(taskForm),
-      });
-
-      const result = await res.json();
-
-      if (!res.ok) {
-        throw new Error(result.error || "Не удалось сохранить задачу");
-      }
-
-      toast.success(editingTask ? "Задача обновлена" : "Задача создана");
-      setIsTaskModalOpen(false);
-      setEditingTask(null);
-      setTaskForm(createEmptyTaskForm(teams[0]?.id));
-      window.dispatchEvent(new Event("taska:workspace-updated"));
-    } catch (taskError) {
-      toast.error(
-        taskError instanceof Error
-          ? taskError.message
-          : "Не удалось сохранить задачу",
-      );
-    } finally {
-      setSavingTask(false);
-    }
-  };
-
-  const openTaskCreateModal = () => {
-    if (teams.length === 0) {
-      setIsCreateTeamOpen(true);
-      return;
-    }
-
-    setEditingTask(null);
-    setTaskForm(createEmptyTaskForm(teams[0]?.id));
-    setIsTaskModalOpen(true);
-  };
+  const workspace = useDashboardWorkspace();
 
   return (
     <>
@@ -349,23 +70,23 @@ export default function DashboardPage() {
                 <div className="mt-6 grid gap-3 md:grid-cols-3">
                   <div className="rounded-3xl bg-muted p-4">
                     <p className="text-sm text-muted-foreground">Активных задач</p>
-                    <p className="mt-2 text-3xl font-semibold">{activeTasks.length}</p>
+                    <p className="mt-2 text-3xl font-semibold">{workspace.activeTasks.length}</p>
                     <p className="mt-2 text-sm text-muted-foreground">
                       Всё, что ещё не переведено в готово
                     </p>
                   </div>
                   <div className="rounded-3xl bg-muted p-4">
                     <p className="text-sm text-muted-foreground">Команд в работе</p>
-                    <p className="mt-2 text-3xl font-semibold">{teams.length}</p>
+                    <p className="mt-2 text-3xl font-semibold">{workspace.teams.length}</p>
                     <p className="mt-2 text-sm text-muted-foreground">
                       Начните с первой команды, если список пуст
                     </p>
                   </div>
                   <div className="rounded-3xl bg-muted p-4">
                     <p className="text-sm text-muted-foreground">Закрыто задач</p>
-                    <p className="mt-2 text-3xl font-semibold">{doneTasksCount}</p>
+                    <p className="mt-2 text-3xl font-semibold">{workspace.doneTasksCount}</p>
                     <p className="mt-2 text-sm text-primary">
-                      Высокий приоритет сейчас у {highPriorityCount} задач
+                      Высокий приоритет сейчас у {workspace.highPriorityCount} задач
                     </p>
                   </div>
                 </div>
@@ -382,8 +103,8 @@ export default function DashboardPage() {
                 </div>
 
                 <div className="mt-5 space-y-3">
-                  {focusTasks.length > 0 ? (
-                    focusTasks.map((task) => (
+                  {workspace.focusTasks.length > 0 ? (
+                    workspace.focusTasks.map((task) => (
                       <div key={task.id} className="rounded-3xl bg-muted p-4">
                         <div className="flex items-start justify-between gap-3">
                           <div>
@@ -448,32 +169,32 @@ export default function DashboardPage() {
                       color="primary"
                       className="rounded-xl"
                       startContent={<Plus size={16} />}
-                      onPress={openTaskCreateModal}
+                      onPress={workspace.openTaskCreateModal}
                     >
                       Новая задача
                     </Button>
                   </div>
                 </div>
 
-                {loading ? (
+                {workspace.loading ? (
                   <div className="mt-6 rounded-[26px] border border-dashed border-border bg-muted/30 p-8 text-center">
                     <LoaderCircle className="mx-auto animate-spin text-primary" />
                     <p className="mt-3 text-sm text-muted-foreground">
                       Загружаем команды и задачи...
                     </p>
                   </div>
-                ) : error ? (
+                ) : workspace.error ? (
                   <div className="mt-6 rounded-[26px] border border-dashed border-danger/30 bg-danger/5 p-8 text-center">
-                    <p className="text-base font-medium">{error}</p>
+                    <p className="text-base font-medium">{workspace.error}</p>
                     <Button
                       variant="light"
                       className="mt-4 rounded-xl"
-                      onPress={() => void loadWorkspace()}
+                      onPress={() => void workspace.loadWorkspace()}
                     >
                       Повторить загрузку
                     </Button>
                   </div>
-                ) : teams.length === 0 ? (
+                ) : workspace.teams.length === 0 ? (
                   <div className="mt-6 rounded-[26px] border border-dashed border-border bg-muted/30 p-8 text-center">
                     <div className="mx-auto inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
                       <Users size={22} />
@@ -489,12 +210,12 @@ export default function DashboardPage() {
                       color="primary"
                       className="mt-5 rounded-xl"
                       startContent={<Plus size={16} />}
-                      onPress={() => setIsCreateTeamOpen(true)}
+                      onPress={() => workspace.setIsCreateTeamOpen(true)}
                     >
                       Создать первую команду
                     </Button>
                   </div>
-                ) : tasks.length === 0 ? (
+                ) : workspace.tasks.length === 0 ? (
                   <div className="mt-6 rounded-[26px] border border-dashed border-border bg-muted/30 p-8 text-center">
                     <div className="mx-auto inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
                       <Flag size={22} />
@@ -508,9 +229,9 @@ export default function DashboardPage() {
                     </p>
                     <Button
                       color="primary"
-                      className="mt-5 rounded-xl"
+                      className="mt-5 rounded-xl" 
                       startContent={<Plus size={16} />}
-                      onPress={openTaskCreateModal}
+                      onPress={workspace.openTaskCreateModal}
                     >
                       Создать первую задачу
                     </Button>
@@ -520,15 +241,23 @@ export default function DashboardPage() {
                     <div className="grid gap-3 md:grid-cols-3">
                       <div className="rounded-3xl bg-muted p-4">
                         <p className="text-sm text-muted-foreground">Всего задач</p>
-                        <p className="mt-2 text-3xl font-semibold">{tasks.length}</p>
+                        <p className="mt-2 text-3xl font-semibold">{workspace.tasks.length}</p>
                       </div>
                       <div className="rounded-3xl bg-muted p-4">
                         <p className="text-sm text-muted-foreground">Активно сейчас</p>
-                        <p className="mt-2 text-3xl font-semibold">{activeTasks.length}</p>
+                        <p className="mt-2 text-3xl font-semibold">{workspace.activeTasks.length}</p>
                       </div>
                       <div className="rounded-3xl bg-muted p-4">
                         <p className="text-sm text-muted-foreground">На проверке</p>
-                        <p className="mt-2 text-3xl font-semibold">{reviewTasksCount}</p>
+                        <p className="mt-2 text-3xl font-semibold">{workspace.reviewTasksCount}</p>
+                      </div>
+                    </div>
+                    <div className="rounded-3xl border border-border bg-background p-4">
+                      <p className="text-sm font-medium text-foreground">
+                        Распределение задач по статусам
+                      </p>
+                      <div className="mt-4 h-64">
+                        <TaskStatusChart counts={workspace.taskStatusCounts} />
                       </div>
                     </div>
                   </div>
@@ -546,8 +275,8 @@ export default function DashboardPage() {
                     </div>
 
                     <div className="mt-5 space-y-4">
-                      {teams.length > 0 ? (
-                        teams.map((team) => (
+                      {workspace.teams.length > 0 ? (
+                        workspace.teams.map((team) => (
                           <div key={team.id} className="rounded-3xl bg-muted p-4">
                             <div className="flex items-center justify-between gap-3">
                               <div className="flex items-center gap-3">
@@ -596,7 +325,7 @@ export default function DashboardPage() {
                           На проверке сейчас
                         </p>
                         <p className="mt-1 text-lg font-semibold">
-                          {reviewTasksCount} задач
+                          {workspace.reviewTasksCount} задач
                         </p>
                       </div>
                       <div className="rounded-3xl bg-muted p-4">
@@ -604,7 +333,7 @@ export default function DashboardPage() {
                           Высокий приоритет
                         </p>
                         <p className="mt-1 text-lg font-semibold">
-                          {highPriorityCount} задач
+                          {workspace.highPriorityCount} задач
                         </p>
                       </div>
                       <div className="rounded-3xl bg-muted p-4">
@@ -612,7 +341,7 @@ export default function DashboardPage() {
                           Уже закрыто
                         </p>
                         <p className="mt-1 text-lg font-semibold">
-                          {doneTasksCount} задач
+                          {workspace.doneTasksCount} задач
                         </p>
                       </div>
                     </div>
@@ -624,93 +353,26 @@ export default function DashboardPage() {
         )}
       </div>
 
-      <Modal isOpen={isCreateTeamOpen} onOpenChange={setIsCreateTeamOpen}>
-        <ModalContent className="rounded-[28px]">
-          {(onClose) => (
-            <>
-              <ModalHeader>Создать команду</ModalHeader>
-              <ModalBody className="space-y-4 pb-2">
-                <Input
-                  label="Название команды"
-                  labelPlacement="outside"
-                  placeholder="Например, Product"
-                  value={teamForm.name}
-                  onValueChange={(value) =>
-                    setTeamForm((current) => ({ ...current, name: value }))
-                  }
-                />
-
-                <div>
-                  <p className="mb-2 text-sm font-medium">Цвет команды</p>
-                  <div className="flex flex-wrap gap-3">
-                    {TEAM_COLOR_OPTIONS.map((color) => (
-                      <button
-                        key={color}
-                        type="button"
-                        className={`h-10 w-10 rounded-full border-2 transition ${
-                          teamForm.color === color
-                            ? "border-foreground scale-105"
-                            : "border-transparent"
-                        }`}
-                        style={{ backgroundColor: color }}
-                        onClick={() =>
-                          setTeamForm((current) => ({ ...current, color }))
-                        }
-                        aria-label={`Выбрать цвет ${color}`}
-                      />
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <p className="mb-2 text-sm font-medium">PM команды</p>
-                  <UnifiedSelect
-                    selectedKeys={teamForm.pmId ? [teamForm.pmId] : []}
-                    onChange={(event) =>
-                      setTeamForm((current) => ({
-                        ...current,
-                        pmId: event.target.value,
-                      }))
-                    }
-                    placeholder="Выберите PM"
-                  >
-                    {teamManagers.map((manager) => (
-                      <UnifiedSelectItem key={manager.id}>
-                        {manager.name || manager.email || "Без имени"}
-                      </UnifiedSelectItem>
-                    ))}
-                  </UnifiedSelect>
-                </div>
-              </ModalBody>
-              <ModalFooter>
-                <Button variant="light" className="rounded-xl" onPress={onClose}>
-                  Отмена
-                </Button>
-                <Button
-                  color="primary"
-                  className="rounded-xl"
-                  isLoading={savingTeam}
-                  isDisabled={!teamForm.pmId}
-                  onPress={() => void handleCreateTeam()}
-                >
-                  Создать команду
-                </Button>
-              </ModalFooter>
-            </>
-          )}
-        </ModalContent>
-      </Modal>
+      <CreateTeamModal
+        isOpen={workspace.isCreateTeamOpen}
+        onOpenChange={workspace.setIsCreateTeamOpen}
+        teamForm={workspace.teamForm}
+        teamManagers={workspace.teamManagers}
+        savingTeam={workspace.savingTeam}
+        onTeamFormChange={workspace.setTeamForm}
+        onCreateTeam={workspace.handleCreateTeam}
+      />
 
       <TaskEditorModal
-        isOpen={isTaskModalOpen}
-        onOpenChange={setIsTaskModalOpen}
-        isEditing={Boolean(editingTask)}
-        taskForm={taskForm}
-        setTaskForm={setTaskForm}
-        teams={teams.map((team) => ({ id: team.id, name: team.name }))}
-        taskAssignees={taskAssignees}
-        isSaving={savingTask}
-        onSubmit={handleCreateTask}
+        isOpen={workspace.isTaskModalOpen}
+        onOpenChange={workspace.setIsTaskModalOpen}
+        isEditing={Boolean(workspace.editingTask)}
+        taskForm={workspace.taskForm}
+        setTaskForm={workspace.setTaskForm}
+        teams={workspace.teams.map((team) => ({ id: team.id, name: team.name }))}
+        taskAssignees={workspace.taskAssignees}
+        isSaving={workspace.savingTask}
+        onSubmit={workspace.handleCreateTask}
       />
     </>
   );

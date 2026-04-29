@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { hasCapability } from "@/app/lib/auth/roles";
+import { USER_SPECIALIZATIONS, hasCapability } from "@/app/lib/auth/roles";
 import { getCurrentUser } from "@/app/lib/auth/session";
 import { prisma } from "@/app/lib/prisma";
 
@@ -16,8 +16,11 @@ export async function GET() {
 
   const users = await prisma.user.findMany({
     where: {
+      id: {
+        not: user.id,
+      },
       specialization: {
-        not: null,
+        in: [...USER_SPECIALIZATIONS],
       },
     },
     orderBy: [{ name: "asc" }, { email: "asc" }],

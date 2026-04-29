@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/app/lib/auth/session";
-import { hasRole } from "@/app/lib/auth/roles";
+import { hasAnyRole, hasRole } from "@/app/lib/auth/roles";
 
 export async function requireAuthenticatedUser() {
   const user = await getCurrentUser();
@@ -16,6 +16,16 @@ export async function requireRootUser() {
   const user = await requireAuthenticatedUser();
 
   if (!hasRole(user.role, "ROOT")) {
+    redirect("/dashboard");
+  }
+
+  return user;
+}
+
+export async function requireRootOrManagerUser() {
+  const user = await requireAuthenticatedUser();
+
+  if (!hasAnyRole(user.role, ["ROOT", "PM"])) {
     redirect("/dashboard");
   }
 

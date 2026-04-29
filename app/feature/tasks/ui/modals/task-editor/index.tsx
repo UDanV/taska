@@ -12,7 +12,6 @@ import {
   ModalHeader,
   Textarea,
 } from "@heroui/react";
-import { toast } from "sonner";
 import {
   USER_SPECIALIZATION_LABELS,
   USER_SPECIALIZATIONS,
@@ -26,77 +25,10 @@ import {
   type TaskPriority,
   type TaskStatus,
 } from "@/app/lib/workspace/constants";
-import { UnifiedSelect, UnifiedSelectItem } from "@/app/feature/tasks/ui/unified-select";
-
-export type TaskModalAssigneeItem = {
-  id: string;
-  name: string | null;
-  email: string | null;
-  specialization: UserSpecialization;
-  teamIds: string[];
-};
-
-export type TaskModalTeamItem = {
-  id: string;
-  name: string;
-};
-
-export type TaskModalFormState = {
-  title: string;
-  description: string;
-  status: TaskStatus;
-  priority: TaskPriority;
-  specialization: UserSpecialization | "";
-  teamId: string;
-  assigneeId: string;
-  photos: string[];
-};
-
-type TaskEditorModalProps = {
-  isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
-  isEditing: boolean;
-  taskForm: TaskModalFormState;
-  setTaskForm: React.Dispatch<React.SetStateAction<TaskModalFormState>>;
-  teams: TaskModalTeamItem[];
-  taskAssignees: TaskModalAssigneeItem[];
-  isSaving: boolean;
-  onSubmit: () => void | Promise<void>;
-};
-
-export function createEmptyTaskForm(teamId?: string): TaskModalFormState {
-  return {
-    title: "",
-    description: "",
-    status: "TODO",
-    priority: "MEDIUM",
-    specialization: "",
-    teamId: teamId ?? "",
-    assigneeId: "",
-    photos: [],
-  };
-}
-
-async function fileToDataUrl(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-
-    reader.onload = () => {
-      if (typeof reader.result === "string") {
-        resolve(reader.result);
-        return;
-      }
-
-      reject(new Error("Не удалось прочитать файл"));
-    };
-
-    reader.onerror = () => {
-      reject(new Error("Не удалось прочитать файл"));
-    };
-
-    reader.readAsDataURL(file);
-  });
-}
+import { SelectItemUI, SelectUI } from "@/app/shared/components/ui/select";
+import { TaskEditorModalProps } from "../../../types/modals/task-editor";
+import { handleTaskFormPhotoUpload } from "../../../lib/photo-upload";
+import Image from "next/image";
 
 export default function TaskEditorModal({
   isOpen,
@@ -121,48 +53,6 @@ export default function TaskEditorModal({
         assignee.teamIds.includes(taskForm.teamId),
     );
   }, [taskAssignees, taskForm.specialization, taskForm.teamId]);
-
-  const handleTaskFormPhotoUpload = async (files: FileList | null) => {
-    if (!files) {
-      return;
-    }
-
-    const allFiles = Array.from(files);
-    const imageFiles = allFiles.filter((file) => file.type.startsWith("image/"));
-
-    if (imageFiles.length !== allFiles.length) {
-      toast.error("Можно загружать только фотографии");
-      return;
-    }
-
-    const maxPhotos = 8;
-    const remainingSlots = maxPhotos - taskForm.photos.length;
-
-    if (remainingSlots <= 0) {
-      toast.error("Можно добавить максимум 8 фотографий");
-      return;
-    }
-
-    const filesToUpload = imageFiles.slice(0, remainingSlots);
-
-    if (filesToUpload.length < imageFiles.length) {
-      toast.info(`Добавлено ${filesToUpload.length} из ${imageFiles.length} фото`);
-    }
-
-    setProcessingPhotos(true);
-
-    try {
-      const uploadedPhotos = await Promise.all(filesToUpload.map(fileToDataUrl));
-      setTaskForm((current) => ({
-        ...current,
-        photos: [...current.photos, ...uploadedPhotos],
-      }));
-    } catch {
-      toast.error("Не удалось загрузить фотографии");
-    } finally {
-      setProcessingPhotos(false);
-    }
-  };
 
   return (
     <Modal isOpen={isOpen} onOpenChange={onOpenChange} size="4xl">
@@ -198,8 +88,9 @@ export default function TaskEditorModal({
               <div className={`grid gap-4 ${isEditing ? "md:grid-cols-3" : "md:grid-cols-2"}`}>
                 <div>
                   <p className="mb-2 text-sm font-medium">Команда</p>
-                  <UnifiedSelect
+                  <SelectUI
                     selectedKeys={taskForm.teamId ? [taskForm.teamId] : []}
+                    placeholder="Выберите команду"
                     onChange={(event) => {
                       const nextTeamId = event.target.value;
 
@@ -222,16 +113,17 @@ export default function TaskEditorModal({
                     }}
                   >
                     {teams.map((team) => (
-                      <UnifiedSelectItem key={team.id}>{team.name}</UnifiedSelectItem>
+                      <SelectItemUI key={team.id}>{team.name}</SelectItemUI>
                     ))}
-                  </UnifiedSelect>
+                  </SelectUI>
                 </div>
 
                 {isEditing ? (
                   <div>
                     <p className="mb-2 text-sm font-medium">Статус</p>
-                    <UnifiedSelect
+                    <SelectUI
                       selectedKeys={[taskForm.status]}
+                      placeholder="Выберите статус"
                       onChange={(event) =>
                         setTaskForm((current) => ({
                           ...current,
@@ -240,18 +132,19 @@ export default function TaskEditorModal({
                       }
                     >
                       {TASK_STATUSES.map((status) => (
-                        <UnifiedSelectItem key={status}>
+                        <SelectItemUI key={status}>
                           {TASK_STATUS_LABELS[status]}
-                        </UnifiedSelectItem>
+                        </SelectItemUI>
                       ))}
-                    </UnifiedSelect>
+                    </SelectUI>
                   </div>
                 ) : null}
 
                 <div>
                   <p className="mb-2 text-sm font-medium">Приоритет</p>
-                  <UnifiedSelect
+                  <SelectUI
                     selectedKeys={[taskForm.priority]}
+                    placeholder="Выберите приоритет"
                     onChange={(event) =>
                       setTaskForm((current) => ({
                         ...current,
@@ -260,18 +153,18 @@ export default function TaskEditorModal({
                     }
                   >
                     {TASK_PRIORITIES.map((priority) => (
-                      <UnifiedSelectItem key={priority}>
+                      <SelectItemUI key={priority}>
                         {TASK_PRIORITY_LABELS[priority as TaskPriority]}
-                      </UnifiedSelectItem>
+                      </SelectItemUI>
                     ))}
-                  </UnifiedSelect>
+                  </SelectUI>
                 </div>
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
                   <p className="mb-2 text-sm font-medium">Метка задачи</p>
-                  <UnifiedSelect
+                  <SelectUI
                     selectedKeys={taskForm.specialization ? [taskForm.specialization] : []}
                     placeholder="Выберите специализацию"
                     onChange={(event) => {
@@ -297,16 +190,16 @@ export default function TaskEditorModal({
                     }}
                   >
                     {USER_SPECIALIZATIONS.map((specialization) => (
-                      <UnifiedSelectItem key={specialization}>
+                      <SelectItemUI key={specialization}>
                         {USER_SPECIALIZATION_LABELS[specialization]}
-                      </UnifiedSelectItem>
+                      </SelectItemUI>
                     ))}
-                  </UnifiedSelect>
+                  </SelectUI>
                 </div>
 
                 <div>
                   <p className="mb-2 text-sm font-medium">Исполнитель</p>
-                  <UnifiedSelect
+                  <SelectUI
                     selectedKeys={taskForm.assigneeId ? [taskForm.assigneeId] : []}
                     placeholder={
                       taskForm.specialization
@@ -322,11 +215,11 @@ export default function TaskEditorModal({
                     }
                   >
                     {compatibleAssignees.map((assignee) => (
-                      <UnifiedSelectItem key={assignee.id}>
+                      <SelectItemUI key={assignee.id}>
                         {assignee.name || assignee.email || "Без имени"}
-                      </UnifiedSelectItem>
+                      </SelectItemUI>
                     ))}
-                  </UnifiedSelect>
+                  </SelectUI>
                   {taskForm.specialization ? (
                     <p className="mt-2 text-xs text-muted-foreground">
                       Доступны только пользователи из выбранной команды с меткой{" "}
@@ -369,7 +262,12 @@ export default function TaskEditorModal({
                       className="hidden"
                       disabled={processingPhotos}
                       onChange={(event) => {
-                        void handleTaskFormPhotoUpload(event.target.files);
+                        void handleTaskFormPhotoUpload({
+                          files: event.target.files,
+                          currentPhotoCount: taskForm.photos.length,
+                          setProcessingPhotos,
+                          setTaskForm,
+                        });
                         event.currentTarget.value = "";
                       }}
                     />
@@ -384,8 +282,7 @@ export default function TaskEditorModal({
                           key={`task-form-photo-${index}`}
                           className="group relative overflow-hidden rounded-xl border border-border"
                         >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
+                          <Image
                             src={photo}
                             alt={`Фото ${index + 1}`}
                             className="h-24 w-full object-cover"

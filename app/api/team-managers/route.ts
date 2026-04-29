@@ -19,6 +19,9 @@ export async function GET() {
 
   const managers = await prisma.user.findMany({
     where: {
+      id: {
+        not: user.id,
+      },
       role: {
         in: ["PM", "ROOT"],
       },

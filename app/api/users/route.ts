@@ -10,14 +10,19 @@ export async function GET() {
     return NextResponse.json({ error: "Требуется авторизация" }, { status: 401 });
   }
 
-  if (!hasCapability(user.role, "canManageUsers")) {
+  if (!hasCapability(user.role, "canViewUsers")) {
     return NextResponse.json(
-      { error: "Управление пользователями доступно только root" },
+      { error: "Просмотр пользователей доступен только root и менеджеру" },
       { status: 403 },
     );
   }
 
   const users = await prisma.user.findMany({
+    where: {
+      id: {
+        not: user.id,
+      },
+    },
     orderBy: [{ role: "asc" }, { createdAt: "asc" }],
     select: {
       id: true,
@@ -38,7 +43,7 @@ export async function GET() {
       email: item.email,
       image: item.image,
       role: item.role,
-      specialization: item.specialization,
+      specialization: item.specialization === "PM" ? null : item.specialization,
       createdAt: item.createdAt,
       hasPassword: Boolean(item.password),
     })),

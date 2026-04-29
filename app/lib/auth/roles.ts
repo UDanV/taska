@@ -3,7 +3,6 @@ export const USER_SPECIALIZATIONS = [
   "FRONTEND",
   "BACKEND",
   "DEVOPS",
-  "PM",
 ] as const;
 
 export type AppRole = (typeof APP_ROLES)[number];
@@ -26,12 +25,22 @@ export const USER_SPECIALIZATION_LABELS: Record<UserSpecialization, string> = {
   FRONTEND: "Frontend",
   BACKEND: "Backend",
   DEVOPS: "DevOps",
-  PM: "PM",
 };
+
+export function getUserSpecializationLabel(
+  specialization: string | null | undefined,
+): string | null {
+  if (!specialization) {
+    return null;
+  }
+
+  return USER_SPECIALIZATION_LABELS[specialization as UserSpecialization] ?? null;
+}
 
 export const AUTH_CAPABILITIES = {
   canCreateTeam: ["ROOT"],
   canManageUsers: ["ROOT"],
+  canViewUsers: ["ROOT", "PM"],
   canManageTasks: ["ROOT", "PM"],
   canAssignExecutors: ["ROOT", "PM"],
   canDeleteTasks: ["ROOT", "PM"],

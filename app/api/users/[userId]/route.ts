@@ -15,9 +15,12 @@ export async function PATCH(
     return NextResponse.json({ error: "Требуется авторизация" }, { status: 401 });
   }
 
-  if (!hasCapability(currentUser.role, "canManageUsers")) {
+  const canManageUsers = hasCapability(currentUser.role, "canManageUsers");
+  const canManageTasks = hasCapability(currentUser.role, "canManageTasks");
+
+  if (!canManageUsers && !canManageTasks) {
     return NextResponse.json(
-      { error: "Управление пользователями доступно только root" },
+      { error: "Недостаточно прав для обновления пользователя" },
       { status: 403 },
     );
   }
@@ -26,6 +29,22 @@ export async function PATCH(
     const { userId } = await params;
     const body = await req.json();
     const data = updateUserManagementSchema.parse(body);
+
+    const existingUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+
+    if (!existingUser) {
+      return NextResponse.json({ error: "Пользователь не найден" }, { status: 404 });
+    }
+
+    if (!canManageUsers && data.role !== existingUser.role) {
+      return NextResponse.json(
+        { error: "Менеджер может менять только специализацию" },
+        { status: 403 },
+      );
+    }
 
     if (currentUser.id === userId && data.role !== "ROOT") {
       return NextResponse.json(

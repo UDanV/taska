@@ -4,9 +4,10 @@ import { hasCapability } from "@/app/lib/auth/roles";
 import { getCurrentUser } from "@/app/lib/auth/session";
 import { prisma } from "@/app/lib/prisma";
 import { updateTaskSchema } from "@/app/lib/validation/workspace.schema";
+import type { AppRole } from "@/app/lib/auth/roles";
 
-function getTaskScope(userId: string, role: string, taskId: string) {
-  if (role === "ROOT") {
+function getTaskScope(userId: string, role: AppRole, taskId: string) {
+  if (role === "ROOT" as AppRole) {
     return {
       id: taskId,
     };
@@ -146,15 +147,22 @@ export async function PATCH(
         return NextResponse.json(
           {
             error:
-              "Исполнитель может менять только статус задачи на 'На проверке' или 'Готово'",
+              "Исполнитель может менять только статус задачи",
           },
           { status: 403 },
         );
       }
 
-      if (data.status !== "REVIEW" && data.status !== "DONE") {
+      if (
+        data.status !== "IN_PROGRESS" &&
+        data.status !== "REVIEW" &&
+        data.status !== "DONE"
+      ) {
         return NextResponse.json(
-          { error: "Исполнитель может перевести задачу только в 'На проверке' или 'Готово'" },
+          {
+            error:
+              "Исполнитель может менять только статус задачи",
+          },
           { status: 403 },
         );
       }

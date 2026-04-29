@@ -1,4 +1,5 @@
-import { useState, useEffect, type ReactNode } from "react";
+import { useState, useEffect } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { X } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -10,8 +11,6 @@ import {
   ModalContent,
   ModalHeader,
 } from "@heroui/react";
-import { getProviders } from "next-auth/react";
-import { YandexLogo } from "../../icons/common";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import {
@@ -20,24 +19,7 @@ import {
   RegisterData,
   registerSchema,
 } from "@/app/lib/validation/auth.schema";
-import {
-  login,
-  register,
-  socialLogin,
-  type SocialAuthProvider,
-} from "@/app/shared/services/auth";
-
-const socialProviderMeta: Record<
-  SocialAuthProvider,
-  { label: string; icon: ReactNode }
-> = {
-  yandex: {
-    label: "Продолжить через Яндекс ID",
-    icon: <YandexLogo />,
-  },
-};
-
-const socialProviderOrder: SocialAuthProvider[] = ["yandex"];
+import { login, register } from "@/app/shared/services/auth";
 
 interface AuthModalProps {
   open: boolean;
@@ -47,42 +29,16 @@ interface AuthModalProps {
 
 const AuthModal = ({ open, onOpenChange, initialMode }: AuthModalProps) => {
   const [mode, setMode] = useState<"login" | "register">(() => initialMode);
-  const [loading, setLoading] = useState(false);
-  const [socialLoadingProvider, setSocialLoadingProvider] =
-    useState<SocialAuthProvider | null>(null);
-  const [availableSocialProviders, setAvailableSocialProviders] = useState<
-    SocialAuthProvider[]
-  >([]);
+  const loginMutation = useMutation({
+    mutationFn: login,
+  });
+  const registerMutation = useMutation({
+    mutationFn: register,
+  });
 
   useEffect(() => {
     setMode(initialMode);
   }, [initialMode]);
-
-  useEffect(() => {
-    if (!open) return;
-
-    let isMounted = true;
-
-    const loadProviders = async () => {
-      const providers = await getProviders();
-
-      if (!isMounted || !providers) {
-        return;
-      }
-
-      const enabledSocialProviders = socialProviderOrder.filter(
-        (providerId) => providerId in providers,
-      );
-
-      setAvailableSocialProviders(enabledSocialProviders);
-    };
-
-    void loadProviders();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [open]);
 
   const loginForm = useForm<LoginData>({
     resolver: zodResolver(loginSchema),
@@ -104,60 +60,42 @@ const AuthModal = ({ open, onOpenChange, initialMode }: AuthModalProps) => {
   };
 
   const router = useRouter();
-
-  const handleSocialAuth = async (provider: SocialAuthProvider) => {
-    try {
-      setSocialLoadingProvider(provider);
-      await socialLogin(provider);
-    } catch {
-      setSocialLoadingProvider(null);
-      toast.error("Не удалось начать вход через соцсеть");
-    }
-  };
+  const loading = loginMutation.isPending || registerMutation.isPending;
 
   const handleLogin = async (data: LoginData) => {
-    setLoading(true);
-
-    const result = await login(data);
-
-    setLoading(false);
+    const result = await loginMutation.mutateAsync(data);
 
     if (result?.error) {
       toast.error("Неверный email или пароль");
       return;
     }
 
-    toast.success("Добро пожаловать 👋");
+    toast.success("Добро пожаловать");
 
     onOpenChange(false);
     router.push("/dashboard");
   };
 
   const handleRegister = async (data: RegisterData) => {
-    setLoading(true);
-
-    const res = await register(data);
+    const res = await registerMutation.mutateAsync(data);
     const result = await res.json();
 
     if (!res.ok) {
       toast.error(result.error || "Ошибка регистрации");
-      setLoading(false);
       return;
     }
 
-    const loginResult = await login({
+    const loginResult = await loginMutation.mutateAsync({
       email: data.email,
       password: data.password,
     });
-
-    setLoading(false);
 
     if (loginResult?.error) {
       toast.error("Аккаунт создан, но не удалось войти");
       return;
     }
 
-    toast.success("Аккаунт создан 🎉");
+    toast.success("Аккаунт создан");
     onOpenChange(false);
     router.push("/dashboard");
   };
@@ -329,31 +267,6 @@ const AuthModal = ({ open, onOpenChange, initialMode }: AuthModalProps) => {
                     </span>
                   </div>
                 </div>
-
-                {availableSocialProviders.length > 0 ? (
-                  <div className="space-y-2">
-                    {availableSocialProviders.map((provider) => (
-                      <Button
-                        key={provider}
-                        fullWidth
-                        variant="light"
-                        className="justify-start font-medium"
-                        startContent={socialProviderMeta[provider].icon}
-                        isLoading={socialLoadingProvider === provider}
-                        isDisabled={loading || socialLoadingProvider !== null}
-                        onPress={() => handleSocialAuth(provider)}
-                      >
-                        {socialProviderMeta[provider].label}
-                      </Button>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="rounded-xl border border-dashed border-divider px-4 py-3 text-sm text-muted-foreground">
-                    Сейчас доступен вход по email и паролю. Кнопки VK, Яндекс и
-                    Mail.ru появятся автоматически после настройки OAuth-ключей
-                    на сервере.
-                  </div>
-                )}
 
                 <p className="text-center text-sm text-muted-foreground">
                   {mode === "login" ? "Нет аккаунта?" : "Уже есть аккаунт?"}{" "}

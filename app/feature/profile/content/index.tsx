@@ -2,13 +2,14 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Avatar, Button, Chip, Input } from "@heroui/react";
-import { BadgeCheck, KeyRound, ShieldCheck, UserRound } from "lucide-react";
+import { useMutation } from "@tanstack/react-query";
+import { BadgeCheck, KeyRound, UserRound } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import type { AppRole, UserSpecialization } from "@/app/lib/auth/roles";
 import {
   ROLE_LABELS,
-  USER_SPECIALIZATION_LABELS,
+  getUserSpecializationLabel,
 } from "@/app/lib/auth/roles";
 import {
   changePasswordSchema,
@@ -23,11 +24,14 @@ type ProfileContentProps = {
     image: string | null;
     hasPassword: boolean;
     role: AppRole;
-    specialization: UserSpecialization | null;
+    specialization: UserSpecialization;
   };
 };
 
 export default function ProfileContent({ user }: ProfileContentProps) {
+  const changePasswordMutation = useMutation({
+    mutationFn: changePassword,
+  });
   const form = useForm<ChangePasswordData>({
     resolver: zodResolver(changePasswordSchema),
     defaultValues: {
@@ -37,12 +41,10 @@ export default function ProfileContent({ user }: ProfileContentProps) {
     },
   });
   const roleLabel = ROLE_LABELS[user.role];
-  const specializationLabel = user.specialization
-    ? USER_SPECIALIZATION_LABELS[user.specialization]
-    : null;
+  const specializationLabel = getUserSpecializationLabel(user.specialization);
 
   const handleChangePassword = async (data: ChangePasswordData) => {
-    const response = await changePassword(data);
+    const response = await changePasswordMutation.mutateAsync(data);
     const result = await response.json();
 
     if (!response.ok) {
@@ -104,28 +106,13 @@ export default function ProfileContent({ user }: ProfileContentProps) {
               <p className="font-medium">{specializationLabel ?? "Не указана"}</p>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
                 Эта метка назначается root и помогает понимать, чем именно
-                занимается сотрудник: frontend, backend, devops или pm.
+                занимается сотрудник: frontend, backend или devops.
               </p>
             </div>
           </section>
         </div>
 
         <div className="space-y-4">
-          <section className="rounded-[28px] border border-border bg-card p-6 shadow-sm">
-            <div className="flex items-center gap-2">
-              <ShieldCheck size={18} className="text-primary" />
-              <h2 className="text-lg font-semibold">Безопасность</h2>
-            </div>
-
-            <div className="mt-5 rounded-3xl bg-muted p-4">
-              <p className="font-medium">Метод входа</p>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                {user.hasPassword
-                  ? "Этот аккаунт использует email и пароль. Пароль можно сменить ниже."
-                  : "Этот аккаунт создан через социальный вход. Смена пароля для него сейчас недоступна."}
-              </p>
-            </div>
-          </section>
 
           <section className="rounded-[28px] border border-border bg-card p-6 shadow-sm">
             <div className="flex items-center gap-2">
@@ -178,7 +165,7 @@ export default function ProfileContent({ user }: ProfileContentProps) {
                   type="submit"
                   color="primary"
                   className="rounded-xl"
-                  isLoading={form.formState.isSubmitting}
+                  isLoading={changePasswordMutation.isPending}
                 >
                   Обновить пароль
                 </Button>

@@ -1,0 +1,1 @@
+export const TEAMS_MANAGEMENT_QUERY_KEY = ["teams-management"] as const;
