@@ -8,15 +8,33 @@ import { Divider } from "@heroui/react";
 import { LogoIcon } from "@/app/shared/components/icons/common";
 import Link from "next/link";
 
-export default function DashboardHeader() {
+type DashboardHeaderProps = {
+  onOpenSidebar: () => void;
+};
+
+export default function DashboardHeader({ onOpenSidebar }: DashboardHeaderProps) {
   const { theme, toggleTheme, mounted } = useTheme();
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-xl">
       <div className="flex h-16 items-center gap-3 px-4">
-        <Link href="/dashboard" className="mr-auto">
-          <LogoIcon />
-        </Link>
+        <div className="mr-auto flex min-h-10 items-center">
+          <button
+            type="button"
+            className="xl:hidden inline-flex items-center justify-center rounded-xl p-1 text-foreground outline-none ring-offset-background transition hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            aria-label="Открыть меню дашборда"
+            onClick={onOpenSidebar}
+          >
+            <LogoIcon size={48} />
+          </button>
+          <Link
+            href="/dashboard"
+            className="hidden items-center justify-center xl:inline-flex"
+            aria-label="На главную дашборда"
+          >
+            <LogoIcon size={48} />
+          </Link>
+        </div>
 
         <div className="ml-auto flex items-center gap-2">
           <Button

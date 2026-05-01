@@ -148,26 +148,30 @@ const Header = () => {
                   {l.label}
                 </a>
               ))}
-              <button
-                onClick={() => {
-                  setAuthModalMode("login");
-                  setIsAuthModalOpen(true);
-                  setMobileOpen(false);
-                }}
-                className="mt-2 text-center py-3 px-4 rounded-xl bg-primary text-primary-foreground text-sm font-semibold"
-              >
-                Регистрация
-              </button>
-              <button
-                onClick={() => {
-                  setAuthModalMode("register");
-                  setIsAuthModalOpen(true);
-                  setMobileOpen(false);
-                }}
-                className="mt-2 text-center py-3 px-4 rounded-xl bg-primary text-primary-foreground text-sm font-semibold"
-              >
-                Вход
-              </button>
+              {!session?.user ? (
+                <>
+                  <button
+                    onClick={() => {
+                      setAuthModalMode("register");
+                      setIsAuthModalOpen(true);
+                      setMobileOpen(false);
+                    }}
+                    className="mt-2 text-center py-3 px-4 rounded-xl bg-primary text-primary-foreground text-sm font-semibold"
+                  >
+                    Регистрация
+                  </button>
+                  <button
+                    onClick={() => {
+                      setAuthModalMode("login");
+                      setIsAuthModalOpen(true);
+                      setMobileOpen(false);
+                    }}
+                    className="mt-2 text-center py-3 px-4 rounded-xl border bg-background text-foreground text-sm font-semibold"
+                  >
+                    Вход
+                  </button>
+                </>
+              ) : null}
             </div>
           </motion.nav>
         )}

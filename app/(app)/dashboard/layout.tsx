@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
-import DashboardHeader from "@/app/feature/dashboard/ui/header";
-import DashboardSidebar from "@/app/feature/dashboard/ui/sidebar";
+import DashboardShell from "@/app/feature/dashboard/ui/shell";
 
 type DashboardLayoutProps = {
   children: ReactNode;
@@ -9,14 +8,5 @@ type DashboardLayoutProps = {
 export default async function DashboardLayout({
   children,
 }: DashboardLayoutProps) {
-
-  return (
-    <div className="min-h-screen bg-background text-foreground">
-      <DashboardHeader />
-      <div className="flex min-h-[calc(100vh-4rem)]">
-          <DashboardSidebar />
-        <main className="min-w-0 flex-1 bg-background">{children}</main>
-      </div>
-    </div>
-  );
+  return <DashboardShell>{children}</DashboardShell>;
 }

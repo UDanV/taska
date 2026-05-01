@@ -105,8 +105,8 @@ export default function ProfileContent({ user }: ProfileContentProps) {
             <div className="mt-5 rounded-3xl bg-muted p-4">
               <p className="font-medium">{specializationLabel ?? "Не указана"}</p>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                Эта метка назначается root и помогает понимать, чем именно
-                занимается сотрудник: frontend, backend или devops.
+                Эта метка назначается администратором / менеджером и помогает понимать, чем именно
+                занимается сотрудник.
               </p>
             </div>
           </section>

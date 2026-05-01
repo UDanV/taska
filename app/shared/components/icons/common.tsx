@@ -1,4 +1,7 @@
+"use client";
+
 import type { FC, SVGProps } from "react";
+import { useId } from "react";
 
 export type IconSvgProps = SVGProps<SVGSVGElement> & {
   size?: number;
@@ -25,40 +28,45 @@ export const LoadingIcon: FC<IconSvgProps> = ({
   </svg>
 );
 
-const LOGO_ICON_GRADIENT_ID = "taska-logo-icon-accent";
-
 export const LogoIcon: FC<IconSvgProps> = ({
   size = 65,
   width,
   height,
+  className,
   ...props
-}) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width={width || size}
-    height={height || size}
-    viewBox="0 0 70 83"
-    fill="none"
-    {...props}
-  >
-    <circle cx="35" cy="41" r="35" fill={`url(#${LOGO_ICON_GRADIENT_ID})`} />
-    <path
-      d="M42.328 25.136L36.184 62H26.712L32.856 25.136H19.928L21.208 17.328H56.536L55.256 25.136H42.328Z"
-      fill="white"
-    />
-    <defs>
-      <linearGradient
-        id={LOGO_ICON_GRADIENT_ID}
-        x1="15.5"
-        y1="12"
-        x2="60"
-        y2="65"
-        gradientUnits="userSpaceOnUse"
-      >
-        <stop stopColor="var(--primary)" />
-        <stop offset="0.5" stopColor="var(--primary)" stopOpacity="0" />
-        <stop offset="1" stopColor="var(--primary-highlight)" />
-      </linearGradient>
-    </defs>
-  </svg>
-);
+}) => {
+  const reactId = useId();
+  const gradientId = `taska-logo-icon-accent-${reactId.replace(/:/g, "")}`;
+
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={width || size}
+      height={height || size}
+      viewBox="0 0 70 83"
+      fill="none"
+      className={["block shrink-0 leading-none", className].filter(Boolean).join(" ")}
+      {...props}
+    >
+      <circle cx="35" cy="41" r="35" fill={`url(#${gradientId})`} />
+      <path
+        d="M42.328 25.136L36.184 62H26.712L32.856 25.136H19.928L21.208 17.328H56.536L55.256 25.136H42.328Z"
+        fill="white"
+      />
+      <defs>
+        <linearGradient
+          id={gradientId}
+          x1="15.5"
+          y1="12"
+          x2="60"
+          y2="65"
+          gradientUnits="userSpaceOnUse"
+        >
+          <stop stopColor="var(--primary)" />
+          <stop offset="0.5" stopColor="var(--primary)" stopOpacity="0" />
+          <stop offset="1" stopColor="var(--primary-highlight)" />
+        </linearGradient>
+      </defs>
+    </svg>
+  );
+};
