@@ -5,19 +5,15 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 import {
-  AppRole,
   ROLE_LABELS,
   getUserSpecializationLabel,
   hasCapability,
 } from "@/app/lib/auth/roles";
-import {
-  TASKS_TEAM_MANAGERS_QUERY_KEY,
-  TASKS_WORKSPACE_QUERY_KEY,
-} from "@/app/feature/tasks/workspace/query-keys";
 import { TEAMS_MANAGEMENT_QUERY_KEY } from "@/app/feature/teams-management/workspace/query-keys";
-import { USERS_MANAGEMENT_QUERY_KEY } from "../../workspace/query-keys";
-import { UserDraft, UserItem } from "@/app/entities/users/model/types";
-import { patchUser, getUsers } from "../../workspace/api";
+import type { UserDraft, UserItem } from "../model/types";
+import { getUsers, patchUser } from "./api";
+import { USERS_MANAGEMENT_QUERY_KEY } from "./query-keys";
+import { TASKS_TEAM_MANAGERS_QUERY_KEY, TASKS_WORKSPACE_QUERY_KEY } from "@/app/feature/tasks/workspace/query-keys";
 
 const EMPTY_USERS: UserItem[] = [];
 
@@ -71,7 +67,7 @@ export function useUsersManagementWorkspace() {
       return [
         user.name ?? "",
         user.email ?? "",
-        ROLE_LABELS[user.role as AppRole],
+        ROLE_LABELS[user.role],
         getUserSpecializationLabel(user.specialization) ?? "",
       ]
         .join(" ")

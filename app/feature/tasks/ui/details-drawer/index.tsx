@@ -4,7 +4,7 @@ import { ImagePlus, X } from "lucide-react";
 import { Button } from "@heroui/button";
 import { Chip, Drawer, DrawerBody, DrawerContent, DrawerHeader, Textarea } from "@heroui/react";
 import { TASK_STATUS_LABELS } from "@/app/lib/workspace/constants";
-import { TASKS_MESSAGES } from "@/app/feature/tasks/model/constants";
+import { TASKS_MESSAGES } from "@/app/feature/tasks/constants";
 import { TaskDetailsDrawerProps } from "../../types/details-drawer";
 import { formatTaskCommentAt } from "../../lib/date";
 

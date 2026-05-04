@@ -3,7 +3,7 @@
 import { Button } from "@heroui/button";
 import { Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from "@heroui/react";
 import { TEAM_COLOR_OPTIONS } from "@/app/lib/workspace/constants";
-import { TASKS_MESSAGES } from "@/app/feature/tasks/model/constants";
+import { TASKS_MESSAGES } from "@/app/feature/tasks/constants";
 import { CreateTeamModalProps } from "../../../types/modals/create-team";
 import { SelectItemUI, SelectUI } from "@/app/shared/components/ui/select";
 

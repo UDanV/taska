@@ -23,9 +23,7 @@ import type {
   TaskItem,
 } from "@/app/entities/task/model/types";
 import type { TeamItem, TeamManagerItem } from "@/app/entities/team/model/types";
-import type { TaskViewMode } from "@/app/feature/tasks/model/constants";
-import { addDays, getDateKey, isSameMonth } from "../../lib/date";
-import { createEmptyTaskForm } from "../../types/modals/task-editor";
+import type { TaskViewMode } from "@/app/feature/tasks/constants";
 import { deleteTask } from "./api/delete";
 import { getTaskComments, getTasksWorkspace, getTeamManagers } from "./api/get";
 import { patchTask } from "./api/patch";
@@ -36,6 +34,8 @@ import {
   TASKS_WORKSPACE_QUERY_KEY,
 } from "./query-keys";
 import type { PatchTaskPayload, SaveTaskPayload, TasksWorkspaceData, TeamFormState } from "./types";
+import { createEmptyTaskForm } from "../types/modals/task-editor";
+import { addDays, getDateKey, isSameMonth } from "../lib/date";
 
 const EMPTY_TEAMS: TeamItem[] = [];
 const EMPTY_TASKS: TaskItem[] = [];

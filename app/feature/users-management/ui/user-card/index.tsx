@@ -12,7 +12,7 @@ import {
 } from "@/app/lib/auth/roles";
 import { SelectItemUI, SelectUI } from "@/app/shared/components/ui/select";
 import { formatCreatedAt } from "../../lib/date";
-import type { UsersManagementUserCardProps } from "../../model/types";
+import type { UsersManagementUserCardProps } from "@/app/entities/users/model/types";
 
 export default function UsersManagementUserCard({
   user,
@@ -45,13 +45,6 @@ export default function UsersManagementUserCard({
               </Chip>
               <Chip variant="flat" className="rounded-xl">
                 {getUserSpecializationLabel(user.specialization) ?? "Без метки"}
-              </Chip>
-              <Chip
-                variant="flat"
-                className="rounded-xl"
-                color={user.hasPassword ? "success" : "warning"}
-              >
-                {user.hasPassword ? "Локальный вход" : "Соцлогин"}
               </Chip>
             </div>
 

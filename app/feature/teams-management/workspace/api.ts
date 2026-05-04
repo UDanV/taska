@@ -1,5 +1,5 @@
+import { ManagerItem, TeamDraft, TeamItem, TeamUserItem } from "@/app/entities/team/model/types";
 import type { TeamFormState } from "@/app/feature/tasks/types/modals/create-team";
-import type { ManagerItem, TeamDraft, TeamItem, TeamUserItem } from "../types";
 
 export type TeamsManagementData = {
   teams: TeamItem[];

@@ -4,7 +4,7 @@ import { Button, Chip, Input } from "@heroui/react";
 import { SelectItemUI, SelectUI } from "@/app/shared/components/ui/select";
 import { ROLE_LABELS, getUserSpecializationLabel } from "@/app/lib/auth/roles";
 import { TASK_STATUS_LABELS, TEAM_COLOR_OPTIONS } from "@/app/lib/workspace/constants";
-import type { ManagerItem, TeamDraft, TeamItem, TeamUserItem } from "../../model/types";
+import type { ManagerItem, TeamDraft, TeamItem, TeamUserItem } from "@/app/entities/team/model/types";
 
 type TeamsManagementTeamCardProps = {
   team: TeamItem;

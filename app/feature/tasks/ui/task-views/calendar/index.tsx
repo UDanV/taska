@@ -1,5 +1,5 @@
 import { Chip } from "@heroui/chip";
-import { CALENDAR_WEEK_DAYS, TASKS_MESSAGES } from "../../../model/constants";
+import { CALENDAR_WEEK_DAYS, TASKS_MESSAGES } from "../../../constants";
 import { Button } from "@heroui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { getMonthLabel } from "../../../lib/date";

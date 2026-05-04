@@ -3,8 +3,6 @@
 import Link from "next/link";
 import {
   Calendar,
-  ChartBar,
-  ChartPie,
   CheckCircle2,
   Flag,
   LoaderCircle,
@@ -23,7 +21,9 @@ import {
 import CreateTeamModal from "@/app/feature/tasks/ui/modals/create-team";
 import TaskEditorModal from "@/app/feature/tasks/ui/modals/task-editor";
 import { useDashboardWorkspace } from "@/app/feature/dashboard/model/workspace";
-import TaskStatusChart from "@/app/feature/dashboard/ui/charts/task-status";
+import OverviewAnalytics from "@/app/shared/components/dashboard-blocks/overview";
+import QuickInsightsAnalytics from "@/app/shared/components/dashboard-blocks/insights";
+import TaskBoardAnalytics from "@/app/shared/components/dashboard-blocks/task-board";
 
 export default function DashboardPage() {
   const { visibleSections } = useDashboardPreferences();
@@ -61,36 +61,7 @@ export default function DashboardPage() {
         {(visibleSections.overview || visibleSections.focus) && (
           <section className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
             {visibleSections.overview ? (
-              <div className="rounded-[28px] border border-border bg-card p-6 shadow-sm">
-                <div className="flex items-center gap-2">
-                  <ChartBar size={18} className="text-primary" />
-                  <h2 className="font-semibold text-lg tracking-tight">Дашборд</h2>
-                </div>
-
-                <div className="mt-6 grid gap-3 md:grid-cols-3">
-                  <div className="rounded-3xl bg-muted p-4">
-                    <p className="text-sm text-muted-foreground">Активных задач</p>
-                    <p className="mt-2 text-3xl font-semibold">{workspace.activeTasks.length}</p>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      Всё, что ещё не переведено в готово
-                    </p>
-                  </div>
-                  <div className="rounded-3xl bg-muted p-4">
-                    <p className="text-sm text-muted-foreground">Команд в работе</p>
-                    <p className="mt-2 text-3xl font-semibold">{workspace.teams.length}</p>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      Начните с первой команды, если список пуст
-                    </p>
-                  </div>
-                  <div className="rounded-3xl bg-muted p-4">
-                    <p className="text-sm text-muted-foreground">Закрыто задач</p>
-                    <p className="mt-2 text-3xl font-semibold">{workspace.doneTasksCount}</p>
-                    <p className="mt-2 text-sm text-primary">
-                      Высокий приоритет сейчас у {workspace.highPriorityCount} задач
-                    </p>
-                  </div>
-                </div>
-              </div>
+              <OverviewAnalytics />
             ) : null}
 
             {visibleSections.focus ? (
@@ -237,30 +208,7 @@ export default function DashboardPage() {
                     </Button>
                   </div>
                 ) : (
-                  <div className="mt-6 space-y-4">
-                    <div className="grid gap-3 md:grid-cols-3">
-                      <div className="rounded-3xl bg-muted p-4">
-                        <p className="text-sm text-muted-foreground">Всего задач</p>
-                        <p className="mt-2 text-3xl font-semibold">{workspace.tasks.length}</p>
-                      </div>
-                      <div className="rounded-3xl bg-muted p-4">
-                        <p className="text-sm text-muted-foreground">Активно сейчас</p>
-                        <p className="mt-2 text-3xl font-semibold">{workspace.activeTasks.length}</p>
-                      </div>
-                      <div className="rounded-3xl bg-muted p-4">
-                        <p className="text-sm text-muted-foreground">На проверке</p>
-                        <p className="mt-2 text-3xl font-semibold">{workspace.reviewTasksCount}</p>
-                      </div>
-                    </div>
-                    <div className="rounded-3xl border border-border bg-background p-4">
-                      <p className="text-sm font-medium text-foreground">
-                        Распределение задач по статусам
-                      </p>
-                      <div className="mt-4 h-64">
-                        <TaskStatusChart counts={workspace.taskStatusCounts} />
-                      </div>
-                    </div>
-                  </div>
+                  <TaskBoardAnalytics workspace={workspace} />
                 )}
               </div>
             ) : null}
@@ -312,40 +260,7 @@ export default function DashboardPage() {
                 ) : null}
 
                 {visibleSections.insights ? (
-                  <section className="rounded-[28px] border border-border bg-card p-6 shadow-sm">
-                    <div className="flex items-center gap-2">
-                      <ChartPie size={18} className="text-primary" />
-                      <h2 className="font-semibold text-lg tracking-tight">
-                        Быстрые инсайты
-                      </h2>
-                    </div>
-                    <div className="mt-4 space-y-4">
-                      <div className="rounded-3xl bg-muted p-4">
-                        <p className="text-sm text-muted-foreground">
-                          На проверке сейчас
-                        </p>
-                        <p className="mt-1 text-lg font-semibold">
-                          {workspace.reviewTasksCount} задач
-                        </p>
-                      </div>
-                      <div className="rounded-3xl bg-muted p-4">
-                        <p className="text-sm text-muted-foreground">
-                          Высокий приоритет
-                        </p>
-                        <p className="mt-1 text-lg font-semibold">
-                          {workspace.highPriorityCount} задач
-                        </p>
-                      </div>
-                      <div className="rounded-3xl bg-muted p-4">
-                        <p className="text-sm text-muted-foreground">
-                          Уже закрыто
-                        </p>
-                        <p className="mt-1 text-lg font-semibold">
-                          {workspace.doneTasksCount} задач
-                        </p>
-                      </div>
-                    </div>
-                  </section>
+                  <QuickInsightsAnalytics />
                 ) : null}
               </div>
             )}

@@ -5,13 +5,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { TEAM_COLOR_OPTIONS } from "@/app/lib/workspace/constants";
 import type { TeamFormState } from "@/app/feature/tasks/types/modals/create-team";
-import type { ManagerItem, TeamDraft, TeamItem, TeamUserItem } from "../types";
-import {
-  TASKS_TEAM_MANAGERS_QUERY_KEY,
-  TASKS_WORKSPACE_QUERY_KEY,
-} from "@/app/feature/tasks/model/workspace/query-keys";
+import { ManagerItem, TeamDraft, TeamItem, TeamUserItem } from "@/app/entities/team/model/types";
 import { getTeamsManagementData, patchTeam, postTeam } from "./api";
 import { TEAMS_MANAGEMENT_QUERY_KEY } from "./query-keys";
+import { TASKS_TEAM_MANAGERS_QUERY_KEY, TASKS_WORKSPACE_QUERY_KEY } from "../../tasks/workspace/query-keys";
 
 const EMPTY_TEAMS: TeamItem[] = [];
 const EMPTY_MANAGERS: ManagerItem[] = [];

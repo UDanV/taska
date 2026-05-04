@@ -6,13 +6,10 @@ import { toast } from "sonner";
 import { TEAM_COLOR_OPTIONS, TASK_STATUSES } from "@/app/lib/workspace/constants";
 import { createEmptyTaskForm } from "@/app/feature/tasks/types/modals/task-editor";
 import type { TeamFormState } from "@/app/feature/tasks/types/modals/create-team";
-import { getTasksWorkspace, getTeamManagers } from "@/app/feature/tasks/model/workspace/api/get";
-import { patchTask } from "@/app/feature/tasks/model/workspace/api/patch";
-import { postTask, postTeam } from "@/app/feature/tasks/model/workspace/api/post";
-import {
-  TASKS_TEAM_MANAGERS_QUERY_KEY,
-  TASKS_WORKSPACE_QUERY_KEY,
-} from "@/app/feature/tasks/model/workspace/query-keys";
+import { getTasksWorkspace, getTeamManagers } from "@/app/feature/tasks/workspace/api/get";
+import { patchTask } from "@/app/feature/tasks/workspace/api/patch";
+import { postTask, postTeam } from "@/app/feature/tasks/workspace/api/post";
+import { TASKS_TEAM_MANAGERS_QUERY_KEY, TASKS_WORKSPACE_QUERY_KEY } from "@/app/feature/tasks/workspace/query-keys";
 import type {
   DashboardTaskAssigneeItem,
   DashboardTaskItem,

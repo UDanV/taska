@@ -5,8 +5,7 @@ import {
   TASK_VIEW_MODE_ICONS,
   TASK_VIEW_MODE_LABELS,
   TASKS_MESSAGES,
-} from "@/app/feature/tasks/model/constants";
-import { useTasksWorkspace } from "@/app/feature/tasks/model/workspace";
+} from "@/app/feature/tasks/constants";
 import CreateTeamModal from "@/app/feature/tasks/ui/modals/create-team";
 import DeleteTaskModal from "@/app/feature/tasks/ui/modals/delete-task";
 import TaskDetailsDrawer from "@/app/feature/tasks/ui/details-drawer";
@@ -21,6 +20,7 @@ import { USER_SPECIALIZATION_LABELS, USER_SPECIALIZATIONS } from "@/app/lib/auth
 import { TaskListView } from "@/app/feature/tasks/ui/task-views/list";
 import { TaskKanbanView } from "@/app/feature/tasks/ui/task-views/kanban";
 import { TaskCalendarView } from "@/app/feature/tasks/ui/task-views/calendar";
+import { useTasksWorkspace } from "@/app/feature/tasks/workspace";
 
 export default function TasksPage() {
   const workspace = useTasksWorkspace();

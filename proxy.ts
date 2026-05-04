@@ -3,7 +3,7 @@ import { checkVpnAccess, getRequestIp } from "@/app/lib/security/vpn-check";
 
 const VPN_RESTRICTED_PATH = "/vpn-restricted";
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (shouldSkipVpnCheck(pathname)) {

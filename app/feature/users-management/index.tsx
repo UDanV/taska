@@ -7,7 +7,7 @@ import {
   ROLE_DESCRIPTIONS,
   ROLE_LABELS,
 } from "@/app/lib/auth/roles";
-import { useUsersManagementWorkspace } from "@/app/feature/users-management/model/workspace";
+import { useUsersManagementWorkspace } from "@/app/feature/users-management/workspace";
 import UsersManagementUserCard from "@/app/feature/users-management/ui/user-card";
 
 export default function UsersManagementPage() {

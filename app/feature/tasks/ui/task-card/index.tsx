@@ -10,7 +10,7 @@ import {
   TASK_PRIORITY_LABELS,
   TASK_STATUS_LABELS,
 } from "@/app/lib/workspace/constants";
-import { TASKS_MESSAGES } from "@/app/feature/tasks/model/constants";
+import { TASKS_MESSAGES } from "@/app/feature/tasks/constants";
 import { TaskCardProps } from "../../types/task-card";
 import { formatTaskUpdatedAt } from "../../lib/date";
 

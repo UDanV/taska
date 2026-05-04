@@ -1,5 +1,5 @@
 import { KanbanViewProps } from "@/app/feature/tasks/types/task-views/kanban";
-import { TASKS_MESSAGES } from "@/app/feature/tasks/model/constants";
+import { TASKS_MESSAGES } from "@/app/feature/tasks/constants";
 import { Chip } from "@heroui/react";
 import TaskCard from "../../task-card";
 

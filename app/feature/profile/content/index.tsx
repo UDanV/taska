@@ -120,7 +120,7 @@ export default function ProfileContent({ user }: ProfileContentProps) {
               <h2 className="text-lg font-semibold">Смена пароля</h2>
             </div>
 
-            {user.hasPassword ? (
+            {user.hasPassword && (
               <form
                 onSubmit={form.handleSubmit(handleChangePassword)}
                 className="mt-6 space-y-4"
@@ -170,15 +170,6 @@ export default function ProfileContent({ user }: ProfileContentProps) {
                   Обновить пароль
                 </Button>
               </form>
-            ) : (
-              <div className="mt-6 rounded-3xl border border-dashed border-border bg-muted p-4">
-                <p className="font-medium">Смена пароля недоступна</p>
-                <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  Для аккаунтов, созданных через социальные сети, пароль сейчас
-                  не используется. Позже здесь можно будет добавить сценарии
-                  привязки локального входа.
-                </p>
-              </div>
             )}
           </section>
         </div>

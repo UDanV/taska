@@ -3,7 +3,7 @@
 import { Button } from "@heroui/react";
 import { LoaderCircle, Plus, UsersRound } from "lucide-react";
 import CreateTeamModal from "@/app/feature/tasks/ui/modals/create-team";
-import { useTeamsManagementWorkspace } from "@/app/feature/teams-management/model/workspace";
+import { useTeamsManagementWorkspace } from "./workspace";
 import TeamsManagementTeamCard from "@/app/feature/teams-management/ui/team-card";
 
 export default function TeamsManagementPage() {
