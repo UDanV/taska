@@ -1,7 +1,10 @@
 import TaskStatusChart from "@/app/feature/dashboard/ui/charts/task-status";
 import AnalyticsMetricBlock from "../analytics-block";
+import { useDashboardWorkspace } from "@/app/feature/dashboard/model/workspace";
 
-export default function TaskBoardAnalytics({ workspace }: { workspace: DashboardWorkspace }) {
+export default function TaskBoardAnalytics() {
+    const workspace = useDashboardWorkspace();
+
     return (
       <div className="mt-6 grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
         <section className="rounded-3xl border border-border bg-background p-4">

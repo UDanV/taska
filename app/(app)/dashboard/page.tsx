@@ -208,7 +208,7 @@ export default function DashboardPage() {
                     </Button>
                   </div>
                 ) : (
-                  <TaskBoardAnalytics workspace={workspace} />
+                  <TaskBoardAnalytics />
                 )}
               </div>
             ) : null}

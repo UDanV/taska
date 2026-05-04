@@ -10,7 +10,7 @@ import {
   hasCapability,
 } from "@/app/lib/auth/roles";
 import { TEAMS_MANAGEMENT_QUERY_KEY } from "@/app/feature/teams-management/workspace/query-keys";
-import type { UserDraft, UserItem } from "../model/types";
+import type { UserDraft, UserItem } from "@/app/entities/users/model/types";
 import { getUsers, patchUser } from "./api";
 import { USERS_MANAGEMENT_QUERY_KEY } from "./query-keys";
 import { TASKS_TEAM_MANAGERS_QUERY_KEY, TASKS_WORKSPACE_QUERY_KEY } from "@/app/feature/tasks/workspace/query-keys";

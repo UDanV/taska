@@ -1,4 +1,4 @@
-import type { UserDraft, UserItem } from "../model/types";
+import type { UserDraft, UserItem } from "@/app/entities/users/model/types";
 
 export async function getUsers(): Promise<UserItem[]> {
   const response = await fetch("/api/users", { cache: "no-store" });
