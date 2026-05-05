@@ -2,11 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSession } from "next-auth/react";
 import { toast } from "sonner";
+import { hasCapability } from "@/app/lib/auth/roles";
 import { TEAM_COLOR_OPTIONS } from "@/app/lib/workspace/constants";
 import type { TeamFormState } from "@/app/feature/tasks/types/modals/create-team";
 import { ManagerItem, TeamDraft, TeamItem, TeamUserItem } from "@/app/entities/team/model/types";
-import { getTeamsManagementData, patchTeam, postTeam } from "./api";
+import { deleteTeam, getTeamsManagementData, patchTeam, postTeam } from "./api";
 import { TEAMS_MANAGEMENT_QUERY_KEY } from "./query-keys";
 import { TASKS_TEAM_MANAGERS_QUERY_KEY, TASKS_WORKSPACE_QUERY_KEY } from "../../tasks/workspace/query-keys";
 
@@ -38,9 +40,12 @@ function areSameIds(left: string[], right: string[]) {
 }
 
 export function useTeamsManagementWorkspace() {
+  const { data: session } = useSession();
   const queryClient = useQueryClient();
   const [drafts, setDrafts] = useState<Record<string, TeamDraft>>({});
   const [savingTeamId, setSavingTeamId] = useState<string | null>(null);
+  const [teamPendingDelete, setTeamPendingDelete] = useState<TeamItem | null>(null);
+  const [deletingTeamId, setDeletingTeamId] = useState<string | null>(null);
 
   const [isCreateTeamOpen, setIsCreateTeamOpen] = useState(false);
   const [createForm, setCreateForm] = useState<TeamFormState>(getEmptyCreateForm(""));
@@ -57,11 +62,15 @@ export function useTeamsManagementWorkspace() {
   const createTeamMutation = useMutation({
     mutationFn: postTeam,
   });
+  const deleteTeamMutation = useMutation({
+    mutationFn: deleteTeam,
+  });
 
   const teams = teamsQuery.data?.teams ?? EMPTY_TEAMS;
   const managers = teamsQuery.data?.managers ?? EMPTY_MANAGERS;
   const teamUsers = teamsQuery.data?.teamUsers ?? EMPTY_TEAM_USERS;
   const canEditTeams = teamsQuery.data?.canEditTeams ?? false;
+  const canManageTeamMembersCap = hasCapability(session?.user?.role, "canManageTeamMembers");
   const loading = teamsQuery.isPending;
   const error = teamsQuery.error instanceof Error ? teamsQuery.error.message : null;
   const savingTeam = createTeamMutation.isPending;
@@ -99,20 +108,6 @@ export function useTeamsManagementWorkspace() {
     setIsCreateTeamOpen(true);
   }, [canEditTeams, managers]);
 
-  useEffect(() => {
-    const refreshWorkspace = () => {
-      void loadData();
-    };
-
-    window.addEventListener("taska:create-team", openCreateTeamModal);
-    window.addEventListener("taska:workspace-updated", refreshWorkspace);
-
-    return () => {
-      window.removeEventListener("taska:create-team", openCreateTeamModal);
-      window.removeEventListener("taska:workspace-updated", refreshWorkspace);
-    };
-  }, [loadData, openCreateTeamModal]);
-
   const membersTotal = useMemo(
     () => teams.reduce((sum, team) => sum + team.membersCount, 0),
     [teams],
@@ -142,7 +137,16 @@ export function useTeamsManagementWorkspace() {
       setSavingTeamId(teamId);
 
       try {
-        const team = await saveTeamMutation.mutateAsync({ teamId, draft });
+        const teamEntity = teams.find((item) => item.id === teamId);
+        const membersOnly = Boolean(
+          !canEditTeams &&
+            teamEntity &&
+            canManageTeamMembersCap &&
+            session?.user?.id &&
+            teamEntity.pm.id === session.user.id,
+        );
+
+        const team = await saveTeamMutation.mutateAsync({ teamId, draft, membersOnly });
         queryClient.setQueryData<Awaited<ReturnType<typeof getTeamsManagementData>>>(
           TEAMS_MANAGEMENT_QUERY_KEY,
           (current) =>
@@ -176,7 +180,15 @@ export function useTeamsManagementWorkspace() {
         setSavingTeamId(null);
       }
     },
-    [drafts, queryClient, saveTeamMutation, teams],
+    [
+      canEditTeams,
+      canManageTeamMembersCap,
+      drafts,
+      queryClient,
+      saveTeamMutation,
+      session?.user?.id,
+      teams,
+    ],
   );
 
   const handleCreateTeam = useCallback(async () => {
@@ -193,6 +205,55 @@ export function useTeamsManagementWorkspace() {
     }
   }, [createForm, createTeamMutation, managers, queryClient]);
 
+  const requestTeamDelete = useCallback((team: TeamItem) => {
+    setTeamPendingDelete(team);
+  }, []);
+
+  const cancelTeamDelete = useCallback(() => {
+    if (deletingTeamId) {
+      return;
+    }
+
+    setTeamPendingDelete(null);
+  }, [deletingTeamId]);
+
+  const confirmTeamDelete = useCallback(async () => {
+    if (!teamPendingDelete) {
+      return;
+    }
+
+    const teamId = teamPendingDelete.id;
+    setDeletingTeamId(teamId);
+
+    try {
+      await deleteTeamMutation.mutateAsync(teamId);
+      queryClient.setQueryData<Awaited<ReturnType<typeof getTeamsManagementData>>>(
+        TEAMS_MANAGEMENT_QUERY_KEY,
+        (current) =>
+          current
+            ? {
+                ...current,
+                teams: current.teams.filter((team) => team.id !== teamId),
+              }
+            : current,
+      );
+      setDrafts((current) => {
+        const rest = { ...current };
+        delete rest[teamId];
+        return rest;
+      });
+      setTeamPendingDelete(null);
+      toast.success("Команда удалена");
+      await queryClient.invalidateQueries({ queryKey: TEAMS_MANAGEMENT_QUERY_KEY });
+      await queryClient.invalidateQueries({ queryKey: TASKS_WORKSPACE_QUERY_KEY });
+      await queryClient.invalidateQueries({ queryKey: TASKS_TEAM_MANAGERS_QUERY_KEY });
+    } catch (deleteError) {
+      toast.error(deleteError instanceof Error ? deleteError.message : "Не удалось удалить команду");
+    } finally {
+      setDeletingTeamId(null);
+    }
+  }, [deleteTeamMutation, queryClient, teamPendingDelete]);
+
   const getTeamDraft = useCallback(
     (team: TeamItem) =>
       drafts[team.id] ?? {
@@ -204,16 +265,40 @@ export function useTeamsManagementWorkspace() {
     [drafts],
   );
 
+  const canManageMembersForTeam = useCallback(
+    (team: TeamItem) =>
+      canEditTeams ||
+      (canManageTeamMembersCap && Boolean(session?.user?.id && team.pm.id === session.user.id)),
+    [canEditTeams, canManageTeamMembersCap, session?.user?.id],
+  );
+
   const isTeamDirty = useCallback(
-    (team: TeamItem, draft: TeamDraft) =>
-      draft.name !== team.name ||
-      draft.color !== team.color ||
-      draft.pmId !== team.pm.id ||
-      !areSameIds(
+    (team: TeamItem, draft: TeamDraft) => {
+      const membersDirty = !areSameIds(
         draft.memberIds,
         team.members.map((member) => member.user.id),
-      ),
-    [],
+      );
+
+      if (canEditTeams) {
+        return (
+          draft.name !== team.name ||
+          draft.color !== team.color ||
+          draft.pmId !== team.pm.id ||
+          membersDirty
+        );
+      }
+
+      if (
+        canManageTeamMembersCap &&
+        session?.user?.id &&
+        team.pm.id === session.user.id
+      ) {
+        return membersDirty;
+      }
+
+      return false;
+    },
+    [canEditTeams, canManageTeamMembersCap, session?.user?.id],
   );
 
   return {
@@ -223,7 +308,10 @@ export function useTeamsManagementWorkspace() {
     loading,
     error,
     canEditTeams,
+    canManageTeamMembersCap,
     savingTeamId,
+    teamPendingDelete,
+    deletingTeamId,
     isCreateTeamOpen,
     setIsCreateTeamOpen,
     savingTeam,
@@ -236,7 +324,11 @@ export function useTeamsManagementWorkspace() {
     handleDraftChange,
     handleSaveTeam,
     handleCreateTeam,
+    requestTeamDelete,
+    cancelTeamDelete,
+    confirmTeamDelete,
     getTeamDraft,
     isTeamDirty,
+    canManageMembersForTeam,
   };
 }

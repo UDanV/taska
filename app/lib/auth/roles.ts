@@ -17,7 +17,7 @@ export const ROLE_LABELS: Record<AppRole, string> = {
 
 export const ROLE_DESCRIPTIONS: Record<AppRole, string> = {
   ROOT: "Полный доступ к рабочему пространству: команды, задачи, назначения и администрирование.",
-  PM: "Может управлять задачами и назначать исполнителей, но не создает команды.",
+  PM: "Управление задачами и составом своих команд (без смены названия команды и PM). Создание команд — только у администратора.",
   EMPLOYEE: "Может просматривать свои задачи, брать их в работу и отмечать выполнение.",
 };
 
@@ -39,6 +39,8 @@ export function getUserSpecializationLabel(
 
 export const AUTH_CAPABILITIES = {
   canCreateTeam: ["ROOT"],
+  /** Добавлять/убирать участников в команде; смена названия/цвета/PM — только ROOT. */
+  canManageTeamMembers: ["ROOT", "PM"],
   canManageUsers: ["ROOT"],
   canViewUsers: ["ROOT", "PM"],
   canManageTasks: ["ROOT", "PM"],

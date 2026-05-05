@@ -125,48 +125,23 @@ export function useTasksWorkspace() {
   }, [teamManagers]);
 
   const loadWorkspace = useCallback(async () => {
-    await Promise.all([workspaceQuery.refetch(), teamManagersQuery.refetch()]);
+    void workspaceQuery.refetch();
+    void teamManagersQuery.refetch();
     if (selectedTaskId) {
       await queryClient.invalidateQueries({
         queryKey: TASKS_COMMENTS_QUERY_KEY(selectedTaskId),
       });
     }
-  }, [queryClient, selectedTaskId, teamManagersQuery, workspaceQuery]);
+  }, [queryClient, selectedTaskId]);
 
-  useEffect(() => {
-    const openTeamModal = () => {
-      setTeamForm({
-        name: "",
-        color: TEAM_COLOR_OPTIONS[0],
-        pmId: teamManagers[0]?.id ?? "",
-      });
-      setIsCreateTeamOpen(true);
-    };
-
-    const openTaskModal = () => {
-      if (teams.length === 0) {
-        openTeamModal();
-        return;
-      }
-      setEditingTask(null);
-      setTaskForm(createEmptyTaskForm(teams[0]?.id));
-      setIsTaskModalOpen(true);
-    };
-
-    const refreshWorkspace = () => {
-      void loadWorkspace();
-    };
-
-    window.addEventListener("taska:create-team", openTeamModal);
-    window.addEventListener("taska:create-task", openTaskModal);
-    window.addEventListener("taska:workspace-updated", refreshWorkspace);
-
-    return () => {
-      window.removeEventListener("taska:create-team", openTeamModal);
-      window.removeEventListener("taska:create-task", openTaskModal);
-      window.removeEventListener("taska:workspace-updated", refreshWorkspace);
-    };
-  }, [loadWorkspace, teamManagers, teams]);
+  const openTeamModal = useCallback(() => {
+    setTeamForm({
+      name: "",
+      color: TEAM_COLOR_OPTIONS[0],
+      pmId: teamManagers[0]?.id || "",
+    });
+    setIsCreateTeamOpen(true);
+  }, [teamManagers]);
 
   const filteredTasks = useMemo(() => {
     const normalizedSearch = searchQuery.trim().toLowerCase();
@@ -504,13 +479,13 @@ export function useTasksWorkspace() {
 
   const openTaskCreateModal = useCallback(() => {
     if (teams.length === 0) {
-      setIsCreateTeamOpen(true);
+      openTeamModal();
       return;
     }
     setEditingTask(null);
     setTaskForm(createEmptyTaskForm(teams[0]?.id));
     setIsTaskModalOpen(true);
-  }, [teams]);
+  }, [openTeamModal, teams]);
 
   const emptyStateTitle =
     filteredTasks.length === 0 && tasks.length > 0
@@ -590,6 +565,7 @@ export function useTasksWorkspace() {
     handleDeleteTask,
     cancelTaskDelete,
     confirmTaskDelete,
+    openTeamModal,
     openTaskCreateModal,
     emptyStateTitle,
     emptyStateDescription,

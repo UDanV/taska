@@ -1,6 +1,7 @@
 "use client";
 
 import { Button, Chip, Input } from "@heroui/react";
+import { Trash2 } from "lucide-react";
 import { SelectItemUI, SelectUI } from "@/app/shared/components/ui/select";
 import { ROLE_LABELS, getUserSpecializationLabel } from "@/app/lib/auth/roles";
 import { TASK_STATUS_LABELS, TEAM_COLOR_OPTIONS } from "@/app/lib/workspace/constants";
@@ -9,12 +10,18 @@ import type { ManagerItem, TeamDraft, TeamItem, TeamUserItem } from "@/app/entit
 type TeamsManagementTeamCardProps = {
   team: TeamItem;
   draft: TeamDraft;
-  canEditTeams: boolean;
+  /** Название, цвет, PM — только администратор. */
+  canEditTeamMeta: boolean;
+  /** Состав (добавить/убрать участников): администратор или PM этой команды. */
+  canManageMembers: boolean;
+  canDeleteTeam: boolean;
   managers: ManagerItem[];
   teamUsers: TeamUserItem[];
   isDirty: boolean;
   isSaving: boolean;
+  isDeleting: boolean;
   onSave: (teamId: string) => void | Promise<void>;
+  onRequestDelete: (team: TeamItem) => void;
   onDraftChange: <K extends keyof TeamDraft>(teamId: string, key: K, value: TeamDraft[K]) => void;
 };
 
@@ -25,12 +32,16 @@ function getManagerLabel(manager: ManagerItem) {
 export default function TeamsManagementTeamCard({
   team,
   draft,
-  canEditTeams,
+  canEditTeamMeta,
+  canManageMembers,
+  canDeleteTeam,
   managers,
   teamUsers,
   isDirty,
   isSaving,
+  isDeleting,
   onSave,
+  onRequestDelete,
   onDraftChange,
 }: TeamsManagementTeamCardProps) {
   return (
@@ -48,20 +59,37 @@ export default function TeamsManagementTeamCard({
             </p>
           </div>
 
-          {canEditTeams ? (
-            <Button
-              color="primary"
-              className="rounded-xl"
-              isDisabled={!isDirty}
-              isLoading={isSaving}
-              onPress={() => void onSave(team.id)}
-            >
-              Сохранить
-            </Button>
+          {canDeleteTeam || canManageMembers ? (
+            <div className="flex items-center gap-2">
+              {canDeleteTeam ? (
+                <Button
+                  isIconOnly
+                  color="danger"
+                  variant="light"
+                  className="rounded-xl"
+                  isDisabled={isSaving || isDeleting}
+                  isLoading={isDeleting}
+                  onPress={() => onRequestDelete(team)}
+                >
+                  <Trash2 size={18} />
+                </Button>
+              ) : null}
+              {canManageMembers ? (
+                <Button
+                  color="primary"
+                  className="rounded-xl"
+                  isDisabled={!isDirty || isDeleting}
+                  isLoading={isSaving}
+                  onPress={() => void onSave(team.id)}
+                >
+                  Сохранить
+                </Button>
+              ) : null}
+            </div>
           ) : null}
         </div>
 
-        {canEditTeams ? (
+        {canEditTeamMeta ? (
           <div className="grid gap-4 md:grid-cols-3">
             <Input
               label="Название команды"
@@ -82,7 +110,6 @@ export default function TeamsManagementTeamCard({
                     }`}
                     style={{ backgroundColor: color }}
                     onClick={() => onDraftChange(team.id, "color", color)}
-                    aria-label={`Цвет ${color}`}
                   />
                 ))}
               </div>
@@ -103,7 +130,7 @@ export default function TeamsManagementTeamCard({
           </div>
         ) : null}
 
-        {canEditTeams ? (
+        {canManageMembers ? (
           <section className="rounded-3xl bg-background p-4">
             <h3 className="font-medium">Состав команды</h3>
             <p className="mt-1 text-xs text-muted-foreground">

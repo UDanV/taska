@@ -181,7 +181,7 @@ export default function DashboardPage() {
                       color="primary"
                       className="mt-5 rounded-xl"
                       startContent={<Plus size={16} />}
-                      onPress={() => workspace.setIsCreateTeamOpen(true)}
+                      onPress={workspace.openTeamModal}
                     >
                       Создать первую команду
                     </Button>

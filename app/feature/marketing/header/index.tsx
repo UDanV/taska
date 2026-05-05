@@ -77,8 +77,7 @@ const Header = () => {
           <Button
             onPress={toggleTheme}
             variant="light"
-            className="min-w-0 rounded-xl p-2"
-            aria-label="Переключить тему"
+            className="min-w-0 rounded-xl"
           >
             <span className="inline-flex h-[18px] w-[18px] items-center justify-center">
               {mounted ? (

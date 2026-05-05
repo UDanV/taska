@@ -1,14 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { TEAM_COLOR_OPTIONS, TASK_STATUSES } from "@/app/lib/workspace/constants";
 import { createEmptyTaskForm } from "@/app/feature/tasks/types/modals/task-editor";
 import type { TeamFormState } from "@/app/feature/tasks/types/modals/create-team";
-import { getTasksWorkspace, getTeamManagers } from "@/app/feature/tasks/workspace/api/get";
-import { patchTask } from "@/app/feature/tasks/workspace/api/patch";
-import { postTask, postTeam } from "@/app/feature/tasks/workspace/api/post";
 import { TASKS_TEAM_MANAGERS_QUERY_KEY, TASKS_WORKSPACE_QUERY_KEY } from "@/app/feature/tasks/workspace/query-keys";
 import type {
   DashboardTaskAssigneeItem,
@@ -16,6 +13,11 @@ import type {
   DashboardTeamManagerItem,
   DashboardTeamItem,
 } from "../types";
+import { TaskPriority, TaskStatus } from "@prisma/client";
+import { getTasksWorkspace, getTeamManagers } from "@/app/feature/tasks/workspace/api/get";
+import { postTeam } from "@/app/feature/teams-management/workspace/api";
+import { patchTask } from "@/app/feature/tasks/workspace/api/patch";
+import { postTask } from "@/app/feature/tasks/workspace/api/post";
 
 const EMPTY_TEAMS: DashboardTeamItem[] = [];
 const EMPTY_TASKS: DashboardTaskItem[] = [];
@@ -67,7 +69,8 @@ export function useDashboardWorkspace() {
   const savingTask = saveTaskMutation.isPending;
 
   const loadWorkspace = useCallback(async () => {
-    await Promise.all([workspaceQuery.refetch(), teamManagersQuery.refetch()]);
+    void workspaceQuery.refetch();
+    void teamManagersQuery.refetch();
   }, [teamManagersQuery, workspaceQuery]);
 
   const openTeamModal = useCallback(() => {
@@ -89,22 +92,6 @@ export function useDashboardWorkspace() {
     setTaskForm(createEmptyTaskForm(teams[0]?.id));
     setIsTaskModalOpen(true);
   }, [openTeamModal, teams]);
-
-  useEffect(() => {
-    const refreshWorkspace = () => {
-      void loadWorkspace();
-    };
-
-    window.addEventListener("taska:create-team", openTeamModal);
-    window.addEventListener("taska:create-task", openTaskCreateModal);
-    window.addEventListener("taska:workspace-updated", refreshWorkspace);
-
-    return () => {
-      window.removeEventListener("taska:create-team", openTeamModal);
-      window.removeEventListener("taska:create-task", openTaskCreateModal);
-      window.removeEventListener("taska:workspace-updated", refreshWorkspace);
-    };
-  }, [loadWorkspace, openTeamModal, openTaskCreateModal]);
 
   const handleCreateTeam = useCallback(async () => {
     try {
@@ -139,19 +126,23 @@ export function useDashboardWorkspace() {
     }
   }, [editingTask, queryClient, saveTaskMutation, teams]);
 
-  const activeTasks = useMemo(() => tasks.filter((task) => task.status !== "DONE"), [tasks]);
+  const activeTasks = useMemo(() => tasks.filter((task) => task.status !== TaskStatus.DONE), [tasks]);
+
   const reviewTasksCount = useMemo(
-    () => tasks.filter((task) => task.status === "REVIEW").length,
+    () => tasks.filter((task) => task.status === TaskStatus.REVIEW).length,
     [tasks],
   );
-  const doneTasksCount = useMemo(() => tasks.filter((task) => task.status === "DONE").length, [tasks]);
+  const doneTasksCount = useMemo(() => tasks.filter((task) => task.status === TaskStatus.DONE).length, [tasks]);
+
   const highPriorityCount = useMemo(
-    () => tasks.filter((task) => task.priority === "HIGH").length,
+    () => tasks.filter((task) => task.priority === TaskPriority.HIGH).length,
     [tasks],
   );
+
   const focusTasks = useMemo(() => activeTasks.slice(0, 3), [activeTasks]);
+
   const taskStatusCounts = useMemo(
-    () => TASK_STATUSES.map((status) => tasks.filter((task) => task.status === status).length),
+    () => TASK_STATUSES.map((status) => tasks.filter((task) => task.status === status as TaskStatus).length),
     [tasks],
   );
 
@@ -176,6 +167,7 @@ export function useDashboardWorkspace() {
     loadWorkspace,
     handleCreateTeam,
     handleCreateTask,
+    openTeamModal,
     openTaskCreateModal,
     activeTasks,
     reviewTasksCount,

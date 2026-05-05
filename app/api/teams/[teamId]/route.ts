@@ -15,13 +15,6 @@ export async function PATCH(
     return NextResponse.json({ error: "Требуется авторизация" }, { status: 401 });
   }
 
-  if (!hasCapability(user.role, "canCreateTeam")) {
-    return NextResponse.json(
-      { error: "Недостаточно прав для редактирования команды" },
-      { status: 403 },
-    );
-  }
-
   const { teamId } = await params;
 
   try {
@@ -41,6 +34,38 @@ export async function PATCH(
 
     if (!team) {
       return NextResponse.json({ error: "Команда не найдена" }, { status: 404 });
+    }
+
+    const canFullEdit = hasCapability(user.role, "canCreateTeam");
+    const canEditMembersOnly =
+      hasCapability(user.role, "canManageTeamMembers") && team.pmId === user.id;
+
+    if (!canFullEdit) {
+      if (!canEditMembersOnly) {
+        return NextResponse.json(
+          { error: "Недостаточно прав для редактирования команды" },
+          { status: 403 },
+        );
+      }
+
+      const triesMetaChange =
+        teamData.name !== undefined ||
+        teamData.color !== undefined ||
+        teamData.pmId !== undefined;
+
+      if (triesMetaChange) {
+        return NextResponse.json(
+          { error: "Менеджер может менять только состав команды" },
+          { status: 403 },
+        );
+      }
+
+      if (memberIds === undefined) {
+        return NextResponse.json(
+          { error: "Укажите состав команды" },
+          { status: 400 },
+        );
+      }
     }
 
     if (teamData.pmId) {
@@ -219,6 +244,54 @@ export async function PATCH(
 
     return NextResponse.json(
       { error: "Не удалось обновить команду" },
+      { status: 400 },
+    );
+  }
+}
+
+export async function DELETE(
+  _req: Request,
+  { params }: { params: Promise<{ teamId: string }> },
+) {
+  const user = await getCurrentUser();
+
+  if (!user?.id) {
+    return NextResponse.json({ error: "Требуется авторизация" }, { status: 401 });
+  }
+
+  if (!hasCapability(user.role, "canCreateTeam")) {
+    return NextResponse.json(
+      { error: "Недостаточно прав для удаления команды" },
+      { status: 403 },
+    );
+  }
+
+  const { teamId } = await params;
+
+  try {
+    const team = await prisma.team.findUnique({
+      where: {
+        id: teamId,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!team) {
+      return NextResponse.json({ error: "Команда не найдена" }, { status: 404 });
+    }
+
+    await prisma.team.delete({
+      where: {
+        id: teamId,
+      },
+    });
+
+    return NextResponse.json({ success: true });
+  } catch {
+    return NextResponse.json(
+      { error: "Не удалось удалить команду" },
       { status: 400 },
     );
   }

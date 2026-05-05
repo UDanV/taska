@@ -1,22 +1,17 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { checkVpnAccess, getRequestIp } from "@/app/lib/security/vpn-check";
+import { checkVpnForRequest } from "@/app/lib/security/vpn-check";
 
 const VPN_RESTRICTED_PATH = "/vpn-restricted";
+const VPN_REACH_API = "/api/security/vpn-reachability";
 
-export async function proxy(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (shouldSkipVpnCheck(pathname)) {
     return NextResponse.next();
   }
 
-  const ip = getRequestIp(request);
-
-  if (!ip) {
-    return NextResponse.next();
-  }
-
-  const result = await checkVpnAccess(ip);
+  const result = await checkVpnForRequest(request);
 
   if (!result.blocked) {
     return NextResponse.next();
@@ -44,5 +39,11 @@ export const config = {
 };
 
 function shouldSkipVpnCheck(pathname: string) {
-  return pathname === VPN_RESTRICTED_PATH || pathname.startsWith(`${VPN_RESTRICTED_PATH}/`);
+  if (pathname === VPN_RESTRICTED_PATH || pathname.startsWith(`${VPN_RESTRICTED_PATH}/`)) {
+    return true;
+  }
+  if (pathname === VPN_REACH_API || pathname.startsWith(`${VPN_REACH_API}/`)) {
+    return true;
+  }
+  return false;
 }

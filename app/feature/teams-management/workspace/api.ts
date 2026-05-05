@@ -34,16 +34,19 @@ export async function getTeamsManagementData(): Promise<TeamsManagementData> {
 export async function patchTeam({
   teamId,
   draft,
+  membersOnly = false,
 }: {
   teamId: string;
   draft: TeamDraft;
+  membersOnly?: boolean;
 }) {
+  const payload = membersOnly ? { memberIds: draft.memberIds } : draft;
   const res = await fetch(`/api/teams/${teamId}`, {
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(draft),
+    body: JSON.stringify(payload),
   });
   const result = await res.json();
 
@@ -66,6 +69,19 @@ export async function postTeam(payload: TeamFormState) {
 
   if (!res.ok) {
     throw new Error(result.error || "Не удалось создать команду");
+  }
+
+  return result;
+}
+
+export async function deleteTeam(teamId: string) {
+  const res = await fetch(`/api/teams/${teamId}`, {
+    method: "DELETE",
+  });
+  const result = await res.json();
+
+  if (!res.ok) {
+    throw new Error(result.error || "Не удалось удалить команду");
   }
 
   return result;

@@ -1,4 +1,7 @@
 import type { NextRequest } from "next/server";
+import { verifyReachabilityToken } from "@/app/lib/security/vpn-probe-token";
+
+export const VPN_REACH_COOKIE_NAME = "taska_vpn_reach";
 
 type VpnCheckResult = {
   blocked: boolean;
@@ -35,6 +38,33 @@ export function getRequestIp(request: NextRequest): string | null {
   }
 
   return headerIp;
+}
+
+export async function checkVpnForRequest(request: NextRequest): Promise<VpnCheckResult> {
+  if (!isVpnCheckEnabled()) {
+    return { blocked: false };
+  }
+
+  const secret = process.env.VPN_PROBE_SECRET;
+  const reachEnabled = process.env.VPN_CHECK_REACHABILITY === "true";
+
+  if (reachEnabled && secret) {
+    const raw = request.cookies.get(VPN_REACH_COOKIE_NAME)?.value;
+    const verified = await verifyReachabilityToken(secret, raw);
+    if (verified?.foreignReachable) {
+      return { blocked: true, reason: "restricted-services-reachable" };
+    }
+    if (verified && !verified.foreignReachable && process.env.VPN_REACH_SKIP_IP_WHEN_CLEAR === "true") {
+      return { blocked: false };
+    }
+  }
+
+  const ip = getRequestIp(request);
+  if (!ip) {
+    return { blocked: false };
+  }
+
+  return checkVpnAccess(ip);
 }
 
 export async function checkVpnAccess(ip: string): Promise<VpnCheckResult> {

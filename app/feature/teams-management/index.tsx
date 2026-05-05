@@ -5,6 +5,7 @@ import { LoaderCircle, Plus, UsersRound } from "lucide-react";
 import CreateTeamModal from "@/app/feature/tasks/ui/modals/create-team";
 import { useTeamsManagementWorkspace } from "./workspace";
 import TeamsManagementTeamCard from "@/app/feature/teams-management/ui/team-card";
+import DeleteTeamModal from "@/app/feature/teams-management/ui/delete-team-modal";
 
 export default function TeamsManagementPage() {
   const workspace = useTeamsManagementWorkspace();
@@ -79,12 +80,16 @@ export default function TeamsManagementPage() {
                     key={team.id}
                     team={team}
                     draft={draft}
-                    canEditTeams={workspace.canEditTeams}
+                    canEditTeamMeta={workspace.canEditTeams}
+                    canManageMembers={workspace.canManageMembersForTeam(team)}
+                    canDeleteTeam={workspace.canEditTeams}
                     managers={workspace.managers}
                     teamUsers={workspace.teamUsers}
                     isDirty={workspace.isTeamDirty(team, draft)}
                     isSaving={workspace.savingTeamId === team.id}
+                    isDeleting={workspace.deletingTeamId === team.id}
                     onSave={workspace.handleSaveTeam}
+                    onRequestDelete={workspace.requestTeamDelete}
                     onDraftChange={workspace.handleDraftChange}
                   />
                 );
@@ -102,6 +107,20 @@ export default function TeamsManagementPage() {
         savingTeam={workspace.savingTeam}
         onTeamFormChange={workspace.setCreateForm}
         onCreateTeam={workspace.handleCreateTeam}
+      />
+      <DeleteTeamModal
+        isOpen={Boolean(workspace.teamPendingDelete)}
+        team={workspace.teamPendingDelete}
+        isDeleting={
+          Boolean(workspace.teamPendingDelete) &&
+          workspace.deletingTeamId === workspace.teamPendingDelete?.id
+        }
+        onOpenChange={(isOpen) => {
+          if (!isOpen) {
+            workspace.cancelTeamDelete();
+          }
+        }}
+        onConfirm={workspace.confirmTeamDelete}
       />
     </>
   );

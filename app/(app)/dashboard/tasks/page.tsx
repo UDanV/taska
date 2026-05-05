@@ -176,7 +176,7 @@ export default function TasksPage() {
                   color="primary"
                   className="mt-5 rounded-xl"
                   startContent={<Plus size={16} />}
-                  onPress={() => workspace.setIsCreateTeamOpen(true)}
+                  onPress={workspace.openTeamModal}
                 >
                   {TASKS_MESSAGES.createFirstTeam}
                 </Button>

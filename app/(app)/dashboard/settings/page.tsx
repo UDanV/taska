@@ -68,7 +68,6 @@ export default function DashboardSettingsPage() {
                   <Switch
                     isSelected={visibleSections[sectionId]}
                     onValueChange={(enabled) => toggleSection(sectionId, enabled)}
-                    aria-label={`Показать блок ${section.title}`}
                   />
                 </div>
               );
@@ -97,7 +96,6 @@ export default function DashboardSettingsPage() {
                     value={accentColor}
                     onChange={(event) => setAccentColor(event.target.value)}
                     className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                    aria-label="Выбрать акцентный цвет"
                   />
                 </label>
 
@@ -120,7 +118,6 @@ export default function DashboardSettingsPage() {
                     <button
                       key={color}
                       type="button"
-                      aria-label={`Выбрать цвет ${color}`}
                       onClick={() => setAccentColor(color)}
                       className={`h-11 w-11 rounded-2xl border-2 transition-transform hover:scale-105 ${isActive
                           ? "border-foreground shadow-sm"

@@ -16,7 +16,7 @@ import { hasCapability } from "@/app/lib/auth/roles";
 
 const navigation = [
   {
-    label: "Аналитика",
+    label: "Дашборд",
     href: "/dashboard",
     icon: LayoutDashboard,
     exact: true,

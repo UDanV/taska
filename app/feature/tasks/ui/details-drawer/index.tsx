@@ -7,6 +7,7 @@ import { TASK_STATUS_LABELS } from "@/app/lib/workspace/constants";
 import { TASKS_MESSAGES } from "@/app/feature/tasks/constants";
 import { TaskDetailsDrawerProps } from "../../types/details-drawer";
 import { formatTaskCommentAt } from "../../lib/date";
+import Image from "next/image";
 
 export default function TaskDetailsDrawer({
   isOpen,
@@ -96,9 +97,8 @@ export default function TaskDetailsDrawer({
                           key={`${selectedTask.id}-photo-${index}`}
                           className="group relative overflow-hidden rounded-xl border border-border"
                         >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={photo}
+                          <Image
+                            src={photo as string}
                             alt={`Фото задачи ${index + 1}`}
                             className="h-28 w-full object-cover"
                           />
@@ -107,7 +107,6 @@ export default function TaskDetailsDrawer({
                             className="absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm transition hover:bg-danger hover:text-danger-foreground"
                             onClick={() => void onRemoveTaskPhoto(index)}
                             disabled={savingPhotos}
-                            aria-label={TASKS_MESSAGES.deletePhoto}
                           >
                             <X size={14} />
                           </button>

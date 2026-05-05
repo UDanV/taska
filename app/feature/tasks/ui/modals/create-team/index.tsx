@@ -43,7 +43,6 @@ export default function CreateTeamModal({
                       className={`h-10 w-10 rounded-full border-2 transition ${teamForm.color === color ? "scale-105 border-foreground" : "border-transparent"}`}
                       style={{ backgroundColor: color }}
                       onClick={() => onTeamFormChange((current) => ({ ...current, color }))}
-                      aria-label={`Выбрать цвет ${color}`}
                     />
                   ))}
                 </div>

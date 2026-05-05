@@ -298,7 +298,6 @@ export default function TaskEditorModal({
                                 ),
                               }))
                             }
-                            aria-label="Удалить фото"
                           >
                             <X size={14} />
                           </button>

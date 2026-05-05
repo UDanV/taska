@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { X } from "lucide-react";
+import { Eye, EyeOff, X } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -29,6 +29,9 @@ interface AuthModalProps {
 
 const AuthModal = ({ open, onOpenChange, initialMode }: AuthModalProps) => {
   const [mode, setMode] = useState<"login" | "register">(() => initialMode);
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [showRegisterPassword, setShowRegisterPassword] = useState(false);
+  const [showRegisterConfirmPassword, setShowRegisterConfirmPassword] = useState(false);
   const loginMutation = useMutation({
     mutationFn: login,
   });
@@ -52,6 +55,9 @@ const AuthModal = ({ open, onOpenChange, initialMode }: AuthModalProps) => {
 
   const switchMode = () => {
     setMode(mode === "login" ? "register" : "login");
+    setShowLoginPassword(false);
+    setShowRegisterPassword(false);
+    setShowRegisterConfirmPassword(false);
     if (mode === "login") {
       registerForm.reset();
     } else {
@@ -100,6 +106,19 @@ const AuthModal = ({ open, onOpenChange, initialMode }: AuthModalProps) => {
     router.push("/dashboard");
   };
 
+  const getPasswordVisibilityButton = (isVisible: boolean, onToggle: () => void) => (
+    <Button
+      isIconOnly
+      size="sm"
+      variant="light"
+      type="button"
+      className="min-w-0 text-muted-foreground"
+      onPress={onToggle}
+    >
+      {isVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+    </Button>
+  );
+
   return (
     <Modal
       isOpen={open}
@@ -128,7 +147,6 @@ const AuthModal = ({ open, onOpenChange, initialMode }: AuthModalProps) => {
               variant="light"
               onPress={onClose}
               className="absolute right-3 top-3 z-10 min-w-0 rounded-full"
-              aria-label="Закрыть модальное окно"
             >
               <X className="h-4 w-4" />
             </Button>
@@ -166,12 +184,15 @@ const AuthModal = ({ open, onOpenChange, initialMode }: AuthModalProps) => {
 
                     <Input
                       id="login-password"
-                      type="password"
+                      type={showLoginPassword ? "text" : "password"}
                       label="Пароль"
                       labelPlacement="inside"
                       placeholder="••••••"
                       variant="flat"
                       radius="md"
+                      endContent={getPasswordVisibilityButton(showLoginPassword, () =>
+                        setShowLoginPassword((current) => !current),
+                      )}
                       {...loginForm.register("password")}
                       isInvalid={!!loginForm.formState.errors.password}
                       errorMessage={loginForm.formState.errors.password?.message}
@@ -219,12 +240,15 @@ const AuthModal = ({ open, onOpenChange, initialMode }: AuthModalProps) => {
 
                     <Input
                       id="reg-password"
-                      type="password"
+                      type={showRegisterPassword ? "text" : "password"}
                       label="Пароль"
                       labelPlacement="inside"
                       placeholder="••••••"
                       variant="flat"
                       radius="md"
+                      endContent={getPasswordVisibilityButton(showRegisterPassword, () =>
+                        setShowRegisterPassword((current) => !current),
+                      )}
                       {...registerForm.register("password")}
                       isInvalid={!!registerForm.formState.errors.password}
                       errorMessage={registerForm.formState.errors.password?.message}
@@ -232,12 +256,15 @@ const AuthModal = ({ open, onOpenChange, initialMode }: AuthModalProps) => {
 
                     <Input
                       id="reg-confirm"
-                      type="password"
+                      type={showRegisterConfirmPassword ? "text" : "password"}
                       label="Повторите пароль"
                       labelPlacement="inside"
                       placeholder="••••••"
                       variant="flat"
                       radius="md"
+                      endContent={getPasswordVisibilityButton(showRegisterConfirmPassword, () =>
+                        setShowRegisterConfirmPassword((current) => !current),
+                      )}
                       {...registerForm.register("confirmPassword")}
                       isInvalid={!!registerForm.formState.errors.confirmPassword}
                       errorMessage={
@@ -257,16 +284,6 @@ const AuthModal = ({ open, onOpenChange, initialMode }: AuthModalProps) => {
                   </form>
                 )}
 
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t border-divider" />
-                  </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-content1 px-2 text-muted-foreground">
-                      или
-                    </span>
-                  </div>
-                </div>
 
                 <p className="text-center text-sm text-muted-foreground">
                   {mode === "login" ? "Нет аккаунта?" : "Уже есть аккаунт?"}{" "}

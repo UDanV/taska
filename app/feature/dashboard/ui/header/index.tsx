@@ -22,7 +22,6 @@ export default function DashboardHeader({ onOpenSidebar }: DashboardHeaderProps)
           <button
             type="button"
             className="xl:hidden inline-flex items-center justify-center rounded-xl p-1 text-foreground outline-none ring-offset-background transition hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            aria-label="Открыть меню дашборда"
             onClick={onOpenSidebar}
           >
             <LogoIcon size={48} />
@@ -30,7 +29,6 @@ export default function DashboardHeader({ onOpenSidebar }: DashboardHeaderProps)
           <Link
             href="/dashboard"
             className="hidden items-center justify-center xl:inline-flex"
-            aria-label="На главную дашборда"
           >
             <LogoIcon size={48} />
           </Link>
@@ -40,8 +38,7 @@ export default function DashboardHeader({ onOpenSidebar }: DashboardHeaderProps)
           <Button
             onPress={toggleTheme}
             variant="light"
-            className="min-w-0 rounded-xl p-2"
-            aria-label="Переключить тему"
+            className="min-w-0 rounded-xl"
           >
             <span className="inline-flex h-[18px] w-[18px] items-center justify-center">
               {mounted ? (

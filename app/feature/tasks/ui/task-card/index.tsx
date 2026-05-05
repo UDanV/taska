@@ -107,7 +107,7 @@ export default function TaskCard({
                   <MoreHorizontal size={16} />
                 </Button>
               </DropdownTrigger>
-              <DropdownMenu aria-label={`Действия для задачи ${task.title}`}>
+              <DropdownMenu>
                 <DropdownItem
                   key="edit"
                   startContent={<PenSquare size={16} />}

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isDisposableEmail } from "@/app/lib/validation/disposable-email";
 
 export const loginSchema = z.object({
   email: z.string().email("Введите корректный email"),
@@ -8,7 +9,10 @@ export const loginSchema = z.object({
 export const registerSchema = z
   .object({
     name: z.string().min(2, "Минимум 2 символа"),
-    email: z.string().email("Введите корректный email"),
+    email: z
+      .string()
+      .email("Введите корректный email")
+      .refine((email) => !isDisposableEmail(email), "Временные email не поддерживаются"),
     password: z.string().min(6, "Минимум 6 символов"),
     confirmPassword: z.string().min(6),
   })
