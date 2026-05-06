@@ -8,7 +8,6 @@ import { useRouter } from "next/navigation";
 import { ThemeProvider } from "next-themes";
 import { useState } from "react";
 import { Toaster } from "sonner";
-import { VpnReachabilityProbe } from "@/app/lib/security/vpn-reachability-probe";
 import { DashboardPreferencesProvider } from "@/app/shared/providers/dashboard-preferences";
 
 type ProvidersProps = {
@@ -36,7 +35,6 @@ export function Providers({ children, session }: ProvidersProps) {
         <QueryClientProvider client={queryClient}>
           <HeroUIProvider navigate={router.push}>
             <SessionProvider session={session}>
-              <VpnReachabilityProbe />
               {children}
             </SessionProvider>
             <Toaster richColors position="top-right" expand />

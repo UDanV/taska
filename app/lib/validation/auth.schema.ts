@@ -21,6 +21,11 @@ export const registerSchema = z
     path: ["confirmPassword"],
   });
 
+export const verifyRegistrationCodeSchema = z.object({
+  email: z.string().email("Введите корректный email"),
+  code: z.string().regex(/^\d{6}$/, "Введите 6-значный код"),
+});
+
 export const changePasswordSchema = z
   .object({
     currentPassword: z.string().min(6, "Минимум 6 символов"),
@@ -38,4 +43,5 @@ export const changePasswordSchema = z
 
 export type LoginData = z.infer<typeof loginSchema>;
 export type RegisterData = z.infer<typeof registerSchema>;
+export type VerifyRegistrationCodeData = z.infer<typeof verifyRegistrationCodeSchema>;
 export type ChangePasswordData = z.infer<typeof changePasswordSchema>;

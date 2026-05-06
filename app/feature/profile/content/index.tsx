@@ -70,7 +70,7 @@ export default function ProfileContent({ user }: ProfileContentProps) {
             <div className="mt-6 flex flex-col gap-5 lg:flex-row lg:items-center">
               <Avatar
                 name={user.name || user.email || "Taska"}
-                className="h-20 w-20 bg-primary font-semibold text-primary-foreground"
+                className="h-20 w-20 bg-primary font-semibold text-primary-foreground text-3xl leading-none flex items-center justify-center"
               />
 
               <div className="space-y-2">

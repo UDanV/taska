@@ -2,6 +2,7 @@ import {
   ChangePasswordData,
   LoginData,
   RegisterData,
+  VerifyRegistrationCodeData,
 } from "@/app/lib/validation/auth.schema";
 import { signIn } from "next-auth/react";
 
@@ -25,6 +26,16 @@ export const socialLogin = async (provider: SocialAuthProvider) => {
 
 export const register = async (data: RegisterData) => {
   const res = await fetch("/api/register", {
+    method: "POST",
+    body: JSON.stringify(data),
+    headers: { "Content-Type": "application/json" },
+  });
+
+  return res;
+};
+
+export const verifyRegistrationCode = async (data: VerifyRegistrationCodeData) => {
+  const res = await fetch("/api/register/verify", {
     method: "POST",
     body: JSON.stringify(data),
     headers: { "Content-Type": "application/json" },

@@ -67,7 +67,7 @@ export default function TeamsManagementPage() {
             <div className="mt-6 rounded-[26px] border border-dashed border-border bg-muted/30 p-8 text-center">
               <p className="text-base font-medium">Команд пока нет</p>
               <p className="mt-2 text-sm text-muted-foreground">
-                Создайте первую команду и сразу назначьте для неё PM.
+                Попросите менеджера или администратора создать команду и добавить вас в неё.
               </p>
             </div>
           ) : (

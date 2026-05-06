@@ -138,7 +138,7 @@ export default function DashboardSettingsPage() {
                     Primary
                   </span>
                   <p className="mt-3 text-sm text-muted-foreground">
-                    Кнопки, активные состояния и ключевые акценты dashboard.
+                    Кнопки, активные состояния и ключевые акценты дашборда.
                   </p>
                 </div>
                 <div className="rounded-3xl bg-background p-4 shadow-sm">

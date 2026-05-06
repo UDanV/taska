@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import {
   Calendar,
   CheckCircle2,
@@ -26,6 +27,8 @@ import QuickInsightsAnalytics from "@/app/shared/components/dashboard-blocks/ins
 import TaskBoardAnalytics from "@/app/shared/components/dashboard-blocks/task-board";
 
 export default function DashboardPage() {
+  const { data: session } = useSession();
+  const isEmployee = session?.user?.role === "EMPLOYEE";
   const { visibleSections } = useDashboardPreferences();
   const hasVisibleSections = Object.values(visibleSections).some(Boolean);
   const workspace = useDashboardWorkspace();
@@ -40,7 +43,7 @@ export default function DashboardPage() {
                 <SlidersHorizontal size={22} />
               </div>
               <h1 className="mt-5 text-2xl font-semibold">
-                Все блоки dashboard скрыты
+                Все блоки дашборда скрыты
               </h1>
               <p className="mt-3 text-sm leading-6 text-muted-foreground">
                 Включи нужные секции заново на странице настроек, чтобы собрать
@@ -136,14 +139,16 @@ export default function DashboardPage() {
                     >
                       Список задач
                     </Button>
-                    <Button
-                      color="primary"
-                      className="rounded-xl"
-                      startContent={<Plus size={16} />}
-                      onPress={workspace.openTaskCreateModal}
-                    >
-                      Новая задача
-                    </Button>
+                    {!isEmployee ? (
+                      <Button
+                        color="primary"
+                        className="rounded-xl"
+                        startContent={<Plus size={16} />}
+                        onPress={workspace.openTaskCreateModal}
+                      >
+                        Новая задача
+                      </Button>
+                    ) : null}
                   </div>
                 </div>
 
@@ -175,16 +180,18 @@ export default function DashboardPage() {
                     </h3>
                     <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
                       Создайте свою первую команду, чтобы открыть отдельное
-                      пространство задач и собирать аналитику на dashboard.
+                      пространство задач и собирать аналитику на дашборде.
                     </p>
-                    <Button
-                      color="primary"
-                      className="mt-5 rounded-xl"
-                      startContent={<Plus size={16} />}
-                      onPress={workspace.openTeamModal}
-                    >
-                      Создать первую команду
-                    </Button>
+                    {!isEmployee ? (
+                      <Button
+                        color="primary"
+                        className="mt-5 rounded-xl"
+                        startContent={<Plus size={16} />}
+                        onPress={workspace.openTeamModal}
+                      >
+                        Создать первую команду
+                      </Button>
+                    ) : null}
                   </div>
                 ) : workspace.tasks.length === 0 ? (
                   <div className="mt-6 rounded-[26px] border border-dashed border-border bg-muted/30 p-8 text-center">

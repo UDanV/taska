@@ -1,11 +1,9 @@
 import { useState, useEffect } from "react";
-import { useMutation } from "@tanstack/react-query";
-import { Eye, EyeOff, X } from "lucide-react";
+import { X } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Button,
-  Input,
   Modal,
   ModalBody,
   ModalContent,
@@ -18,8 +16,15 @@ import {
   loginSchema,
   RegisterData,
   registerSchema,
+  VerifyRegistrationCodeData,
+  verifyRegistrationCodeSchema,
 } from "@/app/lib/validation/auth.schema";
-import { login, register } from "@/app/shared/services/auth";
+import LoginForm from "@/app/shared/components/modal/auth/login";
+import RegisterForm from "@/app/shared/components/modal/auth/register";
+import VerifyEmailCodeForm from "@/app/shared/components/modal/auth/verify";
+import { useLoginMutation } from "@/app/shared/components/modal/auth/mutations/use-login-mutation";
+import { useRegisterMutation } from "@/app/shared/components/modal/auth/mutations/use-register-mutation";
+import { useVerifyRegistrationMutation } from "@/app/shared/components/modal/auth/mutations/use-verify-registration-mutation";
 
 interface AuthModalProps {
   open: boolean;
@@ -32,12 +37,13 @@ const AuthModal = ({ open, onOpenChange, initialMode }: AuthModalProps) => {
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showRegisterPassword, setShowRegisterPassword] = useState(false);
   const [showRegisterConfirmPassword, setShowRegisterConfirmPassword] = useState(false);
-  const loginMutation = useMutation({
-    mutationFn: login,
-  });
-  const registerMutation = useMutation({
-    mutationFn: register,
-  });
+  const [pendingRegistration, setPendingRegistration] = useState<{
+    email: string;
+    password: string;
+  } | null>(null);
+  const loginMutation = useLoginMutation();
+  const registerMutation = useRegisterMutation();
+  const verifyRegistrationMutation = useVerifyRegistrationMutation();
 
   useEffect(() => {
     setMode(initialMode);
@@ -53,11 +59,18 @@ const AuthModal = ({ open, onOpenChange, initialMode }: AuthModalProps) => {
     defaultValues: { name: "", email: "", password: "", confirmPassword: "" },
   });
 
+  const verifyRegistrationForm = useForm<VerifyRegistrationCodeData>({
+    resolver: zodResolver(verifyRegistrationCodeSchema),
+    defaultValues: { email: "", code: "" },
+  });
+
   const switchMode = () => {
     setMode(mode === "login" ? "register" : "login");
     setShowLoginPassword(false);
     setShowRegisterPassword(false);
     setShowRegisterConfirmPassword(false);
+    setPendingRegistration(null);
+    verifyRegistrationForm.reset();
     if (mode === "login") {
       registerForm.reset();
     } else {
@@ -66,7 +79,8 @@ const AuthModal = ({ open, onOpenChange, initialMode }: AuthModalProps) => {
   };
 
   const router = useRouter();
-  const loading = loginMutation.isPending || registerMutation.isPending;
+  const loading =
+    loginMutation.isPending || registerMutation.isPending || verifyRegistrationMutation.isPending;
 
   const handleLogin = async (data: LoginData) => {
     const result = await loginMutation.mutateAsync(data);
@@ -91,33 +105,49 @@ const AuthModal = ({ open, onOpenChange, initialMode }: AuthModalProps) => {
       return;
     }
 
-    const loginResult = await loginMutation.mutateAsync({
-      email: data.email,
+    const email = data.email.trim().toLowerCase();
+    setPendingRegistration({
+      email,
       password: data.password,
+    });
+    verifyRegistrationForm.reset({ email, code: "" });
+    toast.success("Код подтверждения отправлен на email");
+  };
+
+  const handleVerifyRegistration = async (data: VerifyRegistrationCodeData) => {
+    if (!pendingRegistration) {
+      toast.error("Сначала заполните форму регистрации");
+      return;
+    }
+
+    const res = await verifyRegistrationMutation.mutateAsync({
+      email: pendingRegistration.email,
+      code: data.code,
+    });
+    const result = await res.json();
+
+    if (!res.ok) {
+      toast.error(result.error || "Ошибка подтверждения кода");
+      return;
+    }
+
+    const loginResult = await loginMutation.mutateAsync({
+      email: pendingRegistration.email,
+      password: pendingRegistration.password,
     });
 
     if (loginResult?.error) {
-      toast.error("Аккаунт создан, но не удалось войти");
+      toast.error("Email подтверждён, но не удалось войти");
       return;
     }
 
     toast.success("Аккаунт создан");
+    setPendingRegistration(null);
+    verifyRegistrationForm.reset();
+    registerForm.reset();
     onOpenChange(false);
     router.push("/dashboard");
   };
-
-  const getPasswordVisibilityButton = (isVisible: boolean, onToggle: () => void) => (
-    <Button
-      isIconOnly
-      size="sm"
-      variant="light"
-      type="button"
-      className="min-w-0 text-muted-foreground"
-      onPress={onToggle}
-    >
-      {isVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-    </Button>
-  );
 
   return (
     <Modal
@@ -165,125 +195,37 @@ const AuthModal = ({ open, onOpenChange, initialMode }: AuthModalProps) => {
             <ModalBody className="px-6 pb-6 pt-2">
               <div className="space-y-4">
                 {mode === "login" ? (
-                  <form
-                    onSubmit={loginForm.handleSubmit(handleLogin)}
-                    className="space-y-4"
-                  >
-                    <Input
-                      id="login-email"
-                      type="email"
-                      label="Email"
-                      labelPlacement="inside"
-                      placeholder="you@example.com"
-                      variant="flat"
-                      radius="md"
-                      {...loginForm.register("email")}
-                      isInvalid={!!loginForm.formState.errors.email}
-                      errorMessage={loginForm.formState.errors.email?.message}
-                    />
-
-                    <Input
-                      id="login-password"
-                      type={showLoginPassword ? "text" : "password"}
-                      label="Пароль"
-                      labelPlacement="inside"
-                      placeholder="••••••"
-                      variant="flat"
-                      radius="md"
-                      endContent={getPasswordVisibilityButton(showLoginPassword, () =>
-                        setShowLoginPassword((current) => !current),
-                      )}
-                      {...loginForm.register("password")}
-                      isInvalid={!!loginForm.formState.errors.password}
-                      errorMessage={loginForm.formState.errors.password?.message}
-                    />
-
-                    <Button
-                      type="submit"
-                      color="primary"
-                      fullWidth
-                      isLoading={loading}
-                      className="font-medium"
-                    >
-                      Войти
-                    </Button>
-                  </form>
+                  <LoginForm
+                    form={loginForm}
+                    loading={loading}
+                    showPassword={showLoginPassword}
+                    onTogglePassword={() => setShowLoginPassword((current) => !current)}
+                    onSubmit={handleLogin}
+                  />
+                ) : pendingRegistration ? (
+                  <VerifyEmailCodeForm
+                    form={verifyRegistrationForm}
+                    loading={loading}
+                    email={pendingRegistration.email}
+                    onSubmit={handleVerifyRegistration}
+                    onResetEmail={() => {
+                      setPendingRegistration(null);
+                      verifyRegistrationForm.reset();
+                    }}
+                  />
                 ) : (
-                  <form
-                    onSubmit={registerForm.handleSubmit(handleRegister)}
-                    className="space-y-4"
-                  >
-                    <Input
-                      id="reg-name"
-                      label="Имя"
-                      labelPlacement="inside"
-                      placeholder="Ваше имя"
-                      variant="flat"
-                      radius="md"
-                      {...registerForm.register("name")}
-                      isInvalid={!!registerForm.formState.errors.name}
-                      errorMessage={registerForm.formState.errors.name?.message}
-                    />
-
-                    <Input
-                      id="reg-email"
-                      type="email"
-                      label="Email"
-                      labelPlacement="inside"
-                      placeholder="you@example.com"
-                      variant="flat"
-                      radius="md"
-                      {...registerForm.register("email")}
-                      isInvalid={!!registerForm.formState.errors.email}
-                      errorMessage={registerForm.formState.errors.email?.message}
-                    />
-
-                    <Input
-                      id="reg-password"
-                      type={showRegisterPassword ? "text" : "password"}
-                      label="Пароль"
-                      labelPlacement="inside"
-                      placeholder="••••••"
-                      variant="flat"
-                      radius="md"
-                      endContent={getPasswordVisibilityButton(showRegisterPassword, () =>
-                        setShowRegisterPassword((current) => !current),
-                      )}
-                      {...registerForm.register("password")}
-                      isInvalid={!!registerForm.formState.errors.password}
-                      errorMessage={registerForm.formState.errors.password?.message}
-                    />
-
-                    <Input
-                      id="reg-confirm"
-                      type={showRegisterConfirmPassword ? "text" : "password"}
-                      label="Повторите пароль"
-                      labelPlacement="inside"
-                      placeholder="••••••"
-                      variant="flat"
-                      radius="md"
-                      endContent={getPasswordVisibilityButton(showRegisterConfirmPassword, () =>
-                        setShowRegisterConfirmPassword((current) => !current),
-                      )}
-                      {...registerForm.register("confirmPassword")}
-                      isInvalid={!!registerForm.formState.errors.confirmPassword}
-                      errorMessage={
-                        registerForm.formState.errors.confirmPassword?.message
-                      }
-                    />
-
-                    <Button
-                      type="submit"
-                      color="primary"
-                      fullWidth
-                      isLoading={loading}
-                      className="font-medium"
-                    >
-                      Создать аккаунт
-                    </Button>
-                  </form>
+                  <RegisterForm
+                    form={registerForm}
+                    loading={loading}
+                    showPassword={showRegisterPassword}
+                    showConfirmPassword={showRegisterConfirmPassword}
+                    onTogglePassword={() => setShowRegisterPassword((current) => !current)}
+                    onToggleConfirmPassword={() =>
+                      setShowRegisterConfirmPassword((current) => !current)
+                    }
+                    onSubmit={handleRegister}
+                  />
                 )}
-
 
                 <p className="text-center text-sm text-muted-foreground">
                   {mode === "login" ? "Нет аккаунта?" : "Уже есть аккаунт?"}{" "}

@@ -2,7 +2,6 @@ import { NextResponse, type NextRequest } from "next/server";
 import { checkVpnForRequest } from "@/app/lib/security/vpn-check";
 
 const VPN_RESTRICTED_PATH = "/vpn-restricted";
-const VPN_REACH_API = "/api/security/vpn-reachability";
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -18,10 +17,13 @@ export async function middleware(request: NextRequest) {
   }
 
   if (pathname.startsWith("/api")) {
-    return NextResponse.json(
+    const response = NextResponse.json(
       { error: "Доступ под VPN или прокси ограничен" },
       { status: 403 },
     );
+    response.headers.set("x-vpn-block-reason", result.reason ?? "restricted");
+    response.headers.set("x-vpn-checked-ip", result.checkedIp ?? "none");
+    return response;
   }
 
   const url = request.nextUrl.clone();
@@ -30,6 +32,7 @@ export async function middleware(request: NextRequest) {
 
   const response = NextResponse.redirect(url);
   response.headers.set("x-vpn-block-reason", result.reason ?? "restricted");
+  response.headers.set("x-vpn-checked-ip", result.checkedIp ?? "none");
 
   return response;
 }
@@ -40,9 +43,6 @@ export const config = {
 
 function shouldSkipVpnCheck(pathname: string) {
   if (pathname === VPN_RESTRICTED_PATH || pathname.startsWith(`${VPN_RESTRICTED_PATH}/`)) {
-    return true;
-  }
-  if (pathname === VPN_REACH_API || pathname.startsWith(`${VPN_REACH_API}/`)) {
     return true;
   }
   return false;
