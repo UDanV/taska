@@ -25,7 +25,7 @@ services:
       NEXTAUTH_URL: "https://task-a.ru"
     ports:
       - "3000:3000"
-    command: sh -c "npx prisma migrate deploy && npm start"
+    command: sh -c "bunx prisma migrate deploy && bun run start"
 
 volumes:
   postgres_data:
