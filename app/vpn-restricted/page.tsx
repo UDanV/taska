@@ -1,29 +1,27 @@
-import type { Metadata } from "next";
+import Link from "next/link";
 import { LogoIcon } from "@/app/shared/components/icons/common";
-
-export const metadata: Metadata = {
-  title: "Доступ ограничен | Taska",
-};
 
 export default function VpnRestrictedPage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-4 text-foreground">
-      <section className="w-full max-w-md rounded-3xl border border-border bg-card/60 p-8 text-center shadow-sm">
-        <div className="flex justify-center">
-          <LogoIcon size={72} />
-        </div>
+      <section className="flex w-full max-w-md flex-col items-center text-center">
+        <LogoIcon size={72} />
         <p className="mt-8 text-sm font-semibold uppercase tracking-[0.3em] text-primary">
-          Доступ ограничен
+          403
         </p>
         <h1 className="mt-3 text-3xl font-bold tracking-tight">
-          Отключите VPN или прокси
+          Доступ под VPN запрещен
         </h1>
         <p className="mt-4 text-sm leading-6 text-muted-foreground">
-          По требованиям безопасности доступ под VPN, прокси или Tor ограничен.
-          Сайт также проверяет доступ к ряду сервисов из вашего браузера: если они
-          открываются, сессия считается обходом ограничений. Отключите VPN и
-          обновите страницу.
+          Сервис доступен только для пользователей из России без VPN или прокси.
+          Отключите VPN и обновите страницу.
         </p>
+        <Link
+          href="/"
+          className="mt-8 inline-flex h-11 items-center justify-center rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+        >
+          Обновить доступ
+        </Link>
       </section>
     </main>
   );

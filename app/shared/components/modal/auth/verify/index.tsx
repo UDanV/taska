@@ -25,15 +25,17 @@ export default function VerifyEmailCodeForm({
         Мы отправили 6-значный код на {email}. Введите его, чтобы завершить регистрацию.
       </p>
 
-      <InputOtp
-        length={6}
-        {...form.register("code")}
-        isInvalid={!!form.formState.errors.code}
-        errorMessage={form.formState.errors.code?.message}
-        onChange={(e) => {
-          form.setValue("code", (e.target as HTMLInputElement).value);
-        }}
-      />
+      <div className="flex justify-center">
+        <InputOtp
+          length={6}
+          {...form.register("code")}
+          isInvalid={!!form.formState.errors.code}
+          errorMessage={form.formState.errors.code?.message}
+          onChange={(e) => {
+            form.setValue("code", (e.target as HTMLInputElement).value);
+          }}
+        />
+      </div>
 
       <Button type="submit" color="primary" fullWidth isLoading={loading} className="font-medium">
         Подтвердить email

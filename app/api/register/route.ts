@@ -56,9 +56,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true, email });
   } catch (error) {
     console.error("register_failed", error);
-    if (error instanceof Error && error.message === "SMTP is not configured") {
+    if (
+      error instanceof Error &&
+      error.message.startsWith("SMTP is not configured")
+    ) {
+      const isProd = process.env.NODE_ENV === "production";
       return NextResponse.json(
-        { error: "Не настроена отправка почты. Обратитесь к администратору" },
+        {
+          error: isProd
+            ? "Не настроена отправка почты. Обратитесь к администратору"
+            : error.message,
+        },
         { status: 500 },
       );
     }

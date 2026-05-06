@@ -38,7 +38,7 @@ export const Testimonials = () => {
           </h2>
         </motion.div>
 
-        <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+        <div className="mx-auto grid max-w-5xl grid-cols-1 gap-6 md:grid-cols-3 md:items-stretch">
           {testimonials.map((t, i) => (
             <motion.div
               key={t.name}
@@ -46,22 +46,22 @@ export const Testimonials = () => {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.5, delay: i * 0.1 }}
-              className="p-6 rounded-2xl bg-card border border-border hover:shadow-lg transition-shadow"
+              className="flex h-full min-h-0 flex-col rounded-2xl border border-border bg-card p-6 transition-shadow hover:shadow-lg"
             >
-              <div className="flex gap-1 mb-4">
+              <div className="mb-4 flex gap-1">
                 {[...Array(5)].map((_, j) => (
                   <Star key={j} size={16} className="fill-primary text-primary" />
                 ))}
               </div>
-              <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
+              <p className="min-h-0 flex-1 text-sm leading-relaxed text-muted-foreground">
                 «{t.text}»
               </p>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center text-sm font-bold text-primary">
+              <div className="mt-6 flex shrink-0 items-center gap-3 border-t border-border/60 pt-5">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/15 text-sm font-bold text-primary">
                   {t.avatar}
                 </div>
-                <div>
-                  <div className="font-semibold text-sm">{t.name}</div>
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold">{t.name}</div>
                   <div className="text-xs text-muted-foreground">{t.role}</div>
                 </div>
               </div>

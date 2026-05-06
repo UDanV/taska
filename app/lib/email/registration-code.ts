@@ -10,22 +10,19 @@ type SmtpConfig = {
 };
 
 function getSmtpConfig(): SmtpConfig {
-  const host = process.env.SMTP_HOST;
-  const port = Number(process.env.SMTP_PORT ?? 587);
-  const user = process.env.SMTP_USER;
-  const password = process.env.SMTP_PASSWORD;
-  const from = process.env.SMTP_FROM;
-
-  if (!host || !Number.isFinite(port) || !user || !password || !from) {
-    throw new Error("SMTP is not configured");
-  }
+  const host = process.env.SMTP_HOST?.trim();
+  const portRaw = process.env.SMTP_PORT?.trim();
+  const port = portRaw ? Number(portRaw) : 587;
+  const user = process.env.SMTP_USER?.trim();
+  const password = process.env.SMTP_PASSWORD?.trim();
+  const from = process.env.SMTP_FROM?.trim();
 
   return {
-    host,
+    host: host!,
     port,
-    user,
-    password,
-    from,
+    user: user!,
+    password: password!,
+    from: from!,
     secure: process.env.SMTP_SECURE === "true" || port === 465,
   };
 }

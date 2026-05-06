@@ -19,10 +19,15 @@ services:
     restart: always
     depends_on:
       - postgres
+    env_file:
+      - .env
     environment:
       DATABASE_URL: "postgresql://taska:taska@postgres:5432/taska_db"
       NEXTAUTH_SECRET: "mYn9+2qFz5X8WpQa7rBvCjL0sEiKxNwPvQa7rBvCjL0sE="
       NEXTAUTH_URL: "https://task-a.ru"
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     ports:
       - "3000:3000"
     command: sh -c "bunx prisma migrate deploy && bun run start"

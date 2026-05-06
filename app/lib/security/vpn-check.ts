@@ -1,206 +1,193 @@
 import type { NextRequest } from "next/server";
-import type { ProxyCheckIpResult, ProxyCheckRoot } from "@/app/lib/security/proxycheck-types";
 
-type VpnCheckResult = {
-  blocked: boolean;
-  reason?: string;
-  checkedIp?: string;
+const RUSSIA_COUNTRY_CODE = "RU";
+const REQUEST_TIMEOUT_MS = 1500;
+
+const IP_HEADERS = [
+  "cf-connecting-ip",
+  "true-client-ip",
+  "x-real-ip",
+  "x-forwarded-for",
+] as const;
+
+type IpApiResponse = {
+  country_code?: string;
 };
 
-const PROXYCHECK_API_URL = "https://proxycheck.io/v3";
-const DEFAULT_RISK_THRESHOLD = 66;
-const DEFAULT_ALLOWED_COUNTRIES = ["RU"];
-const FALLBACK_IP_CACHE_TTL_MS = 60_000;
+type ProxyCheckIpResult = {
+  proxy?: string;
+  type?: string;
+};
 
-let fallbackPublicIpCache: { value: string | null; expiresAt: number } | null = null;
+type ProxyCheckResponse = {
+  status?: string;
+  [ip: string]: ProxyCheckIpResult | string | undefined;
+};
 
-export function getRequestIp(request: NextRequest): string | null {
-  const rawIp =
-    request.headers.get("cf-connecting-ip") ||
-    request.headers.get("true-client-ip") ||
-    request.headers.get("x-real-ip") ||
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    null;
-  const headerIp = normalizeIp(rawIp);
-
-  if (!headerIp || isLocalIp(headerIp)) {
-    return null;
-  }
-
-  return headerIp;
-}
+export type VpnCheckResult = {
+  blocked: boolean;
+  checkedIp?: string;
+  reason?: "non-russian-ip" | "vpn-or-proxy" | "missing-ip" | "private-ip";
+};
 
 export async function checkVpnForRequest(request: NextRequest): Promise<VpnCheckResult> {
-  if (!isVpnCheckEnabled()) {
-    return { blocked: false };
-  }
+  const rawIp = getClientIp(request);
+  const ip = rawIp ? normalizeIp(rawIp) : undefined;
 
-  let ip = getRequestIp(request);
-  if (!ip && isFallbackPublicIpEnabled()) {
-    ip = await resolveFallbackPublicIp();
-  }
   if (!ip) {
-    return { blocked: false };
+    return { blocked: false, reason: "missing-ip" };
   }
 
-  const result = await checkVpnAccess(ip);
-  return { ...result, checkedIp: ip };
+  if (isPrivateOrLocalIp(ip)) {
+    return { blocked: false, checkedIp: ip, reason: "private-ip" };
+  }
+
+  const [geoResult, proxyResult] = await Promise.allSettled([
+    getIpCountryCode(ip),
+    isVpnOrProxy(ip),
+  ]);
+
+  const countryCode =
+    geoResult.status === "fulfilled" ? geoResult.value : undefined;
+
+  if (countryCode && countryCode !== RUSSIA_COUNTRY_CODE) {
+    return { blocked: true, checkedIp: ip, reason: "non-russian-ip" };
+  }
+
+  if (proxyResult.status === "fulfilled" && proxyResult.value) {
+    return { blocked: true, checkedIp: ip, reason: "vpn-or-proxy" };
+  }
+
+  return { blocked: false, checkedIp: ip };
 }
 
-export async function checkVpnAccess(ip: string): Promise<VpnCheckResult> {
-  if (!isVpnCheckEnabled()) {
-    return { blocked: false };
+/** IPv4-mapped IPv6 (::ffff:x.x.x.x) → x.x.x.x for private-range checks and APIs. */
+function normalizeIp(ip: string) {
+  const lower = ip.toLowerCase();
+
+  if (lower.startsWith("::ffff:")) {
+    return lower.slice("::ffff:".length);
   }
 
-  const apiKey = process.env.VPN_CHECK_API_KEY;
-
-  if (!apiKey) {
-    return { blocked: false };
-  }
-
-  const provider = (process.env.VPN_CHECK_PROVIDER ?? "proxycheck").toLowerCase();
-
-  if (provider !== "proxycheck") {
-    return { blocked: false };
-  }
-
-  return checkProxyCheck(ip, apiKey);
+  return ip;
 }
 
-function isVpnCheckEnabled() {
-  return process.env.VPN_CHECK_ENABLED !== "false";
-}
+function getClientIp(request: NextRequest) {
+  for (const header of IP_HEADERS) {
+    const value = request.headers.get(header);
+    const ip = parseIpHeader(value);
 
-async function checkProxyCheck(ip: string, apiKey: string): Promise<VpnCheckResult> {
-  try {
-    const url = new URL(`${PROXYCHECK_API_URL}/${encodeURIComponent(ip)}`);
-    url.searchParams.set("key", apiKey);
-    url.searchParams.set("vpn", "1");
-    url.searchParams.set("asn", "1");
-    url.searchParams.set("risk", "1");
-    url.searchParams.set("country", "1");
-
-    const response = await fetch(url, {
-      headers: {
-        Accept: "application/json",
-      },
-      cache: "no-store",
-    });
-
-    if (!response.ok) {
-      return { blocked: false };
+    if (ip) {
+      return ip;
     }
-
-    const data = (await response.json()) as ProxyCheckRoot;
-    const result = data[ip];
-
-    if (!result || typeof result !== "object") {
-      return { blocked: false };
-    }
-    const ipResult = result as ProxyCheckIpResult;
-
-    const risk = Number(ipResult.detections?.risk ?? 0);
-    const riskThreshold = Number(process.env.VPN_CHECK_RISK_THRESHOLD ?? DEFAULT_RISK_THRESHOLD);
-    const countryCode = ipResult.location?.country_code?.toUpperCase();
-
-    if (process.env.VPN_CHECK_ONLY_RU === "true") {
-      const allowedCountries = getAllowedCountries();
-      if (!countryCode || !allowedCountries.has(countryCode)) {
-        return { blocked: true, reason: `country:${countryCode ?? "unknown"}` };
-      }
-    }
-
-    if (ipResult.detections?.proxy) {
-      return { blocked: true, reason: "proxy" };
-    }
-
-    if (ipResult.detections?.vpn) {
-      return { blocked: true, reason: "vpn" };
-    }
-
-    if (ipResult.detections?.tor) {
-      return { blocked: true, reason: "tor" };
-    }
-
-    if (ipResult.detections?.hosting) {
-      return { blocked: true, reason: "hosting" };
-    }
-
-    if (Number.isFinite(risk) && risk >= riskThreshold) {
-      return { blocked: true, reason: `risk:${risk}` };
-    }
-
-    return { blocked: false };
-  } catch {
-    return { blocked: false };
   }
+
+  return undefined;
 }
 
-function isLocalIp(ip: string) {
+function parseIpHeader(value: string | null) {
+  if (!value) {
+    return undefined;
+  }
+
+  const firstValue = value.split(",")[0]?.trim();
+
+  if (!firstValue || firstValue.toLowerCase() === "unknown") {
+    return undefined;
+  }
+
+  return stripIpPort(firstValue);
+}
+
+function stripIpPort(value: string) {
+  if (value.startsWith("[") && value.includes("]")) {
+    return value.slice(1, value.indexOf("]"));
+  }
+
+  const portSeparatorIndex = value.lastIndexOf(":");
+
+  if (portSeparatorIndex > -1 && value.indexOf(":") === portSeparatorIndex) {
+    return value.slice(0, portSeparatorIndex);
+  }
+
+  return value;
+}
+
+function isPrivateOrLocalIp(ip: string) {
+  const lower = ip.toLowerCase();
+
+  if (lower === "::1" || lower === "localhost") {
+    return true;
+  }
+
+  if (lower.startsWith("::ffff:")) {
+    return isPrivateOrLocalIp(lower.slice("::ffff:".length));
+  }
+
+  if (lower.startsWith("fc") || lower.startsWith("fd") || lower.startsWith("fe80:")) {
+    return true;
+  }
+
+  const parts = ip.split(".").map((part) => Number(part));
+
+  if (parts.length !== 4 || parts.some((part) => Number.isNaN(part))) {
+    return false;
+  }
+
+  const [first, second] = parts;
+
   return (
-    ip === "::1" ||
-    ip === "127.0.0.1" ||
-    ip.startsWith("10.") ||
-    ip.startsWith("192.168.") ||
-    /^172\.(1[6-9]|2\d|3[0-1])\./.test(ip)
+    first === 10 ||
+    first === 127 ||
+    (first === 172 && second >= 16 && second <= 31) ||
+    (first === 192 && second === 168) ||
+    (first === 169 && second === 254)
   );
 }
 
-function normalizeIp(ip: string | null): string | null {
-  if (!ip) return null;
-  const clean = ip.trim().replace(/^\[|\]$/g, "");
-  if (clean.startsWith("::ffff:")) {
-    return clean.slice("::ffff:".length);
+async function getIpCountryCode(ip: string) {
+  const response = await fetchWithTimeout(`https://ipapi.co/${ip}/json/`);
+
+  if (!response.ok) {
+    return undefined;
   }
-  if (/^\d+\.\d+\.\d+\.\d+:\d+$/.test(clean)) {
-    return clean.split(":")[0] ?? clean;
-  }
-  return clean;
+
+  const data = (await response.json()) as IpApiResponse;
+
+  return data.country_code?.toUpperCase();
 }
 
-function getAllowedCountries(): Set<string> {
-  const raw = process.env.VPN_CHECK_ALLOWED_COUNTRIES;
-  if (!raw?.trim()) {
-    return new Set(DEFAULT_ALLOWED_COUNTRIES);
+async function isVpnOrProxy(ip: string) {
+  const url = new URL(`https://proxycheck.io/v2/${ip}`);
+  url.searchParams.set("vpn", "1");
+
+  if (process.env.PROXYCHECK_API_KEY) {
+    url.searchParams.set("key", process.env.PROXYCHECK_API_KEY);
   }
-  const normalized = raw
-    .split(",")
-    .map((s) => s.trim().toUpperCase())
-    .filter(Boolean);
-  return new Set(normalized.length ? normalized : DEFAULT_ALLOWED_COUNTRIES);
+
+  const response = await fetchWithTimeout(url.toString());
+
+  if (!response.ok) {
+    return false;
+  }
+
+  const data = (await response.json()) as ProxyCheckResponse;
+  const result = data[ip];
+
+  return typeof result === "object" && result?.proxy?.toLowerCase() === "yes";
 }
 
-function isFallbackPublicIpEnabled() {
-  return process.env.VPN_CHECK_FALLBACK_PUBLIC_IP !== "false";
-}
-
-async function resolveFallbackPublicIp(): Promise<string | null> {
-  const now = Date.now();
-  if (fallbackPublicIpCache && fallbackPublicIpCache.expiresAt > now) {
-    return fallbackPublicIpCache.value;
-  }
+async function fetchWithTimeout(url: string) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
   try {
-    const response = await fetch("https://api64.ipify.org?format=json", {
+    return await fetch(url, {
       cache: "no-store",
-      headers: { Accept: "application/json" },
+      headers: { accept: "application/json" },
+      signal: controller.signal,
     });
-    if (!response.ok) {
-      fallbackPublicIpCache = { value: null, expiresAt: now + FALLBACK_IP_CACHE_TTL_MS };
-      return null;
-    }
-
-    const data = (await response.json()) as { ip?: string };
-    const normalized = normalizeIp(data.ip ?? null);
-    if (!normalized || isLocalIp(normalized)) {
-      fallbackPublicIpCache = { value: null, expiresAt: now + FALLBACK_IP_CACHE_TTL_MS };
-      return null;
-    }
-
-    fallbackPublicIpCache = { value: normalized, expiresAt: now + FALLBACK_IP_CACHE_TTL_MS };
-    return normalized;
-  } catch {
-    fallbackPublicIpCache = { value: null, expiresAt: now + FALLBACK_IP_CACHE_TTL_MS };
-    return null;
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
