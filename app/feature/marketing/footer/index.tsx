@@ -1,4 +1,5 @@
 import { LogoIcon } from "@/app/shared/components/icons/common";
+import Link from "next/link";
 
 export const Footer = () => {
   return (
@@ -7,9 +8,7 @@ export const Footer = () => {
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
           <span className="text-lg font-bold text-gradient"><LogoIcon /></span>
           <div className="flex gap-6 text-sm text-muted-foreground">
-            <a href="#features" className="hover:text-foreground transition-colors">Возможности</a>
-            <a href="#how" className="hover:text-foreground transition-colors">Как это работает</a>
-            <a href="#testimonials" className="hover:text-foreground transition-colors">Отзывы</a>
+            <p>Powered by <Link href="https://t.me/udanvv" className="hover:text-foreground transition-colors">udanvv</Link></p>
           </div>
           <p className="text-xs text-muted-foreground">© {new Date().getFullYear()} Taska. Все права защищены.</p>
         </div>

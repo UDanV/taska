@@ -26,7 +26,7 @@ export async function getTeamsManagementData(): Promise<TeamsManagementData> {
   return {
     teams: teamsData.teams ?? [],
     managers: managersRes.ok ? (managersData.managers ?? []) : [],
-    teamUsers: managersRes.ok && usersRes.ok ? (usersData.users ?? []) : [],
+    teamUsers: usersRes.ok ? (usersData.users ?? []) : [],
     canEditTeams: managersRes.ok,
   };
 }
