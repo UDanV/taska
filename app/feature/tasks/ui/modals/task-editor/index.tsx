@@ -197,7 +197,7 @@ export default function TaskEditorModal({
                       });
                     }}
                   >
-                    {USER_SPECIALIZATIONS.map((specialization) => (
+                    {Object.values(USER_SPECIALIZATIONS).map((specialization: UserSpecialization) => (
                       <SelectItemUI key={specialization}>
                         {USER_SPECIALIZATION_LABELS[specialization]}
                       </SelectItemUI>

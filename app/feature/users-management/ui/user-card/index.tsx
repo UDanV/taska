@@ -61,7 +61,7 @@ export default function UsersManagementUserCard({
               selectedKeys={[draft.role]}
               onChange={(event) => onDraftChange(user.id, "role", event.target.value as AppRole)}
             >
-              {APP_ROLES.map((role) => (
+              {Object.values(APP_ROLES).map((role: AppRole) => (
                 <SelectItemUI key={role}>{ROLE_LABELS[role]}</SelectItemUI>
               ))}
             </SelectUI>
@@ -78,7 +78,7 @@ export default function UsersManagementUserCard({
               )
             }
           >
-            {USER_SPECIALIZATIONS.map((specialization) => (
+            {Object.values(USER_SPECIALIZATIONS).map((specialization: UserSpecialization) => (
               <SelectItemUI key={specialization}>
                 {USER_SPECIALIZATION_LABELS[specialization]}
               </SelectItemUI>

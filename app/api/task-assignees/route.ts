@@ -20,7 +20,7 @@ export async function GET() {
         not: user.id,
       },
       specialization: {
-        in: [...USER_SPECIALIZATIONS],
+        in: [...Object.values(USER_SPECIALIZATIONS)],
       },
     },
     orderBy: [{ name: "asc" }, { email: "asc" }],
