@@ -1,19 +1,9 @@
 import type { NextAuthOptions } from "next-auth";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import CredentialsProvider from "next-auth/providers/credentials";
-import YandexProvider from "next-auth/providers/yandex";
 import bcrypt from "bcrypt";
 import { DEFAULT_ROLE, UserSpecialization } from "@/app/lib/auth/roles";
 import { prisma } from "@/app/lib/prisma";
-
-const oauthProviders = [
-  process.env.YANDEX_CLIENT_ID && process.env.YANDEX_CLIENT_SECRET
-    ? YandexProvider({
-        clientId: process.env.YANDEX_CLIENT_ID,
-        clientSecret: process.env.YANDEX_CLIENT_SECRET,
-      })
-    : null,
-].filter((provider) => provider !== null);
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
@@ -56,7 +46,6 @@ export const authOptions: NextAuthOptions = {
         };
       },
     }),
-    ...oauthProviders,
   ],
 
   callbacks: {

@@ -55,12 +55,20 @@ export default function TaskEditorModal({
   }, [taskAssignees, taskForm.specialization, taskForm.teamId]);
 
   return (
-    <Modal isOpen={isOpen} onOpenChange={onOpenChange} size="4xl">
-      <ModalContent className="rounded-[28px]">
+    <Modal
+      isOpen={isOpen}
+      onOpenChange={onOpenChange}
+      size="4xl"
+      scrollBehavior="inside"
+      classNames={{
+        base: "mx-2 my-4 sm:mx-6 sm:my-8",
+      }}
+    >
+      <ModalContent className="max-h-[calc(100vh-2rem)] rounded-[28px] sm:max-h-[calc(100vh-4rem)]">
         {(onClose) => (
           <>
             <ModalHeader>{isEditing ? "Редактировать задачу" : "Новая задача"}</ModalHeader>
-            <ModalBody className="space-y-4 pb-2">
+            <ModalBody className="space-y-4 overflow-y-auto pb-2">
               <Input
                 label="Название"
                 labelPlacement="outside"
@@ -312,13 +320,13 @@ export default function TaskEditorModal({
                 </div>
               </div>
             </ModalBody>
-            <ModalFooter>
-              <Button variant="light" className="rounded-xl" onPress={onClose}>
+            <ModalFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button variant="light" className="w-full rounded-xl sm:w-auto" onPress={onClose}>
                 Отмена
               </Button>
               <Button
                 color="primary"
-                className="rounded-xl"
+                className="w-full rounded-xl sm:w-auto"
                 isLoading={isSaving}
                 onPress={() => void onSubmit()}
               >

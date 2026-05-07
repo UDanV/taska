@@ -10,9 +10,7 @@ import type { ManagerItem, TeamDraft, TeamItem, TeamUserItem } from "@/app/entit
 type TeamsManagementTeamCardProps = {
   team: TeamItem;
   draft: TeamDraft;
-  /** Название, цвет, PM — только администратор. */
   canEditTeamMeta: boolean;
-  /** Состав (добавить/убрать участников): администратор или PM этой команды. */
   canManageMembers: boolean;
   canDeleteTeam: boolean;
   managers: ManagerItem[];
@@ -44,6 +42,10 @@ export default function TeamsManagementTeamCard({
   onRequestDelete,
   onDraftChange,
 }: TeamsManagementTeamCardProps) {
+  const ownerMemberIds = team.members
+    .filter((member) => member.teamRole === "OWNER")
+    .map((member) => member.user.id);
+
   return (
     <article className="rounded-[26px] border border-border bg-muted/30 p-5">
       <div className="flex flex-col gap-5">
@@ -133,38 +135,22 @@ export default function TeamsManagementTeamCard({
         {canManageMembers ? (
           <section className="rounded-3xl bg-background p-4">
             <h3 className="font-medium">Состав команды</h3>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Выберите пользователей, которых нужно добавить в эту команду.
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {teamUsers.map((candidate) => {
-                const isMember = draft.memberIds.includes(candidate.id);
-                const isOwner = team.members.some(
-                  (member) => member.user.id === candidate.id && member.teamRole === "OWNER",
-                );
-
-                return (
-                  <Button
-                    key={candidate.id}
-                    size="sm"
-                    variant={isMember ? "solid" : "bordered"}
-                    color={isMember ? "primary" : "default"}
-                    className="rounded-xl"
-                    isDisabled={isOwner}
-                    onPress={() =>
-                      onDraftChange(
-                        team.id,
-                        "memberIds",
-                        isMember
-                          ? draft.memberIds.filter((memberId) => memberId !== candidate.id)
-                          : [...draft.memberIds, candidate.id],
-                      )
-                    }
-                  >
+            <div className="mt-3">
+              <SelectUI
+                selectionMode="multiple"
+                selectedKeys={new Set(draft.memberIds)}
+                disabledKeys={ownerMemberIds}
+                placeholder="Выберите участников"
+                onSelectionChange={(keys) =>
+                  onDraftChange(team.id, "memberIds", Array.from(keys).map(String))
+                }
+              >
+                {teamUsers.map((candidate) => (
+                  <SelectItemUI key={candidate.id}>
                     {candidate.name || candidate.email || "Без имени"}
-                  </Button>
-                );
-              })}
+                  </SelectItemUI>
+                ))}
+              </SelectUI>
             </div>
           </section>
         ) : null}
@@ -187,9 +173,6 @@ export default function TeamsManagementTeamCard({
                         {getUserSpecializationLabel(member.user.specialization) ?? "Без метки"}
                       </Chip>
                     </div>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Роль в команде: {member.teamRole === "OWNER" ? "Владелец" : "Участник"}
-                    </p>
                   </div>
                 ))}
               </div>

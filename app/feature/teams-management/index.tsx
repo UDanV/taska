@@ -12,8 +12,8 @@ export default function TeamsManagementPage() {
 
   return (
     <>
-      <div className="space-y-8 p-4 md:p-6 xl:p-8">
-        <section className="rounded-[28px] border border-border bg-card p-6 shadow-sm">
+      <div className="space-y-6 p-3 sm:p-4 md:p-6 xl:space-y-8 xl:p-8">
+        <section className="rounded-3xl border border-border bg-card p-4 shadow-sm sm:p-5 lg:p-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-2">
               <UsersRound size={18} className="text-primary" />
@@ -23,7 +23,7 @@ export default function TeamsManagementPage() {
             {workspace.canEditTeams ? (
               <Button
                 color="primary"
-                className="rounded-xl"
+                className="w-full rounded-xl sm:w-auto"
                 startContent={<Plus size={16} />}
                 onPress={workspace.openCreateTeamModal}
               >
@@ -32,7 +32,7 @@ export default function TeamsManagementPage() {
             ) : null}
           </div>
 
-          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             <div className="rounded-3xl bg-muted p-4">
               <p className="text-sm text-muted-foreground">Всего команд</p>
               <p className="mt-2 text-3xl font-semibold">{workspace.teams.length}</p>
@@ -48,12 +48,12 @@ export default function TeamsManagementPage() {
           </div>
 
           {workspace.loading ? (
-            <div className="mt-6 rounded-[26px] border border-dashed border-border bg-muted/30 p-8 text-center">
+            <div className="mt-6 rounded-[26px] border border-dashed border-border bg-muted/30 p-6 text-center sm:p-8">
               <LoaderCircle className="mx-auto animate-spin text-primary" />
               <p className="mt-3 text-sm text-muted-foreground">Загружаем команды...</p>
             </div>
           ) : workspace.error ? (
-            <div className="mt-6 rounded-[26px] border border-dashed border-danger/30 bg-danger/5 p-8 text-center">
+            <div className="mt-6 rounded-[26px] border border-dashed border-danger/30 bg-danger/5 p-6 text-center sm:p-8">
               <p className="text-base font-medium">{workspace.error}</p>
               <Button
                 variant="light"
@@ -64,7 +64,7 @@ export default function TeamsManagementPage() {
               </Button>
             </div>
           ) : workspace.teams.length === 0 ? (
-            <div className="mt-6 rounded-[26px] border border-dashed border-border bg-muted/30 p-8 text-center">
+            <div className="mt-6 rounded-[26px] border border-dashed border-border bg-muted/30 p-6 text-center sm:p-8">
               <p className="text-base font-medium">Команд пока нет</p>
               <p className="mt-2 text-sm text-muted-foreground">
                 Попросите менеджера или администратора создать команду и добавить вас в неё.

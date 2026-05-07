@@ -1,46 +1,24 @@
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 
-type SmtpConfig = {
-  host: string;
-  port: number;
-  user: string;
-  password: string;
-  from: string;
-  secure: boolean;
-};
+function getResendClient() {
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  if (!apiKey) {
+    throw new Error("Resend is not configured");
+  }
 
-function getSmtpConfig(): SmtpConfig {
-  const host = process.env.SMTP_HOST?.trim();
-  const portRaw = process.env.SMTP_PORT?.trim();
-  const port = portRaw ? Number(portRaw) : 587;
-  const user = process.env.SMTP_USER?.trim();
-  const password = process.env.SMTP_PASSWORD?.trim();
-  const from = process.env.SMTP_FROM?.trim();
-
-  return {
-    host: host!,
-    port,
-    user: user!,
-    password: password!,
-    from: from!,
-    secure: process.env.SMTP_SECURE === "true" || port === 465,
-  };
+  return new Resend(apiKey);
 }
 
 export async function sendRegistrationCodeEmail(email: string, code: string) {
-  const config = getSmtpConfig();
-  const transporter = nodemailer.createTransport({
-    host: config.host,
-    port: config.port,
-    secure: config.secure,
-    auth: {
-      user: config.user,
-      pass: config.password,
-    },
-  });
+  const resend = getResendClient();
+  const from = process.env.EMAIL_FROM?.trim() || process.env.SMTP_FROM?.trim();
 
-  await transporter.sendMail({
-    from: config.from,
+  if (!from) {
+    throw new Error("Sender email is not configured");
+  }
+
+  const { error } = await resend.emails.send({
+    from,
     to: email,
     subject: "Код подтверждения Taska",
     text: `Ваш код подтверждения Taska: ${code}. Код действует 10 минут.`,
@@ -53,4 +31,8 @@ export async function sendRegistrationCodeEmail(email: string, code: string) {
       </div>
     `,
   });
+
+  if (error) {
+    throw new Error(`Resend send failed: ${error.message}`);
+  }
 }

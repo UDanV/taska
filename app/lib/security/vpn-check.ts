@@ -61,7 +61,6 @@ export async function checkVpnForRequest(request: NextRequest): Promise<VpnCheck
   return { blocked: false, checkedIp: ip };
 }
 
-/** IPv4-mapped IPv6 (::ffff:x.x.x.x) → x.x.x.x for private-range checks and APIs. */
 function normalizeIp(ip: string) {
   const lower = ip.toLowerCase();
 

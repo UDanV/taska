@@ -1,12 +1,17 @@
-export const APP_ROLES = ["ROOT", "PM", "EMPLOYEE"] as const;
-export const USER_SPECIALIZATIONS = [
-  "FRONTEND",
-  "BACKEND",
-  "DEVOPS",
-] as const;
+export const APP_ROLES = {
+  ROOT: "ROOT",
+  PM: "PM",
+  EMPLOYEE: "EMPLOYEE",
+} as const;
 
-export type AppRole = (typeof APP_ROLES)[number];
-export type UserSpecialization = (typeof USER_SPECIALIZATIONS)[number];
+export const USER_SPECIALIZATIONS = {
+  FRONTEND: "FRONTEND",
+  BACKEND: "BACKEND",
+  DEVOPS: "DEVOPS",
+} as const;
+
+export type AppRole = keyof typeof APP_ROLES;
+export type UserSpecialization = keyof typeof USER_SPECIALIZATIONS;
 export const DEFAULT_ROLE: AppRole = "EMPLOYEE";
 
 export const ROLE_LABELS: Record<AppRole, string> = {
@@ -39,7 +44,6 @@ export function getUserSpecializationLabel(
 
 export const AUTH_CAPABILITIES = {
   canCreateTeam: ["ROOT"],
-  /** Добавлять/убирать участников в команде; смена названия/цвета/PM — только ROOT. */
   canManageTeamMembers: ["ROOT", "PM"],
   canManageUsers: ["ROOT"],
   canViewUsers: ["ROOT", "PM"],

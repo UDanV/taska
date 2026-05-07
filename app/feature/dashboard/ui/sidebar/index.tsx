@@ -104,7 +104,7 @@ export default function DashboardSidebar({
         }}
       >
         <DrawerContent>
-          <DrawerBody className="gap-2">
+          <DrawerBody className="gap-2 px-3 pb-3 pt-14 sm:px-4 sm:pt-16">
             <nav className="flex flex-col gap-2">{renderNavItems(true)}</nav>
           </DrawerBody>
         </DrawerContent>

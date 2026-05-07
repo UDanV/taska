@@ -1,7 +1,12 @@
 import { Calendar, Columns3, Table, type LucideIcon } from "lucide-react";
 
-export const TASK_VIEW_MODES = ["list", "kanban", "calendar"] as const;
-export type TaskViewMode = (typeof TASK_VIEW_MODES)[number];
+export const TASK_VIEW_MODES = {
+  list: "list",
+  kanban: "kanban",
+  calendar: "calendar",
+} as const;
+
+export type TaskViewMode = keyof typeof TASK_VIEW_MODES;
 
 export const TASK_VIEW_MODE_LABELS: Record<TaskViewMode, string> = {
   list: "Список",

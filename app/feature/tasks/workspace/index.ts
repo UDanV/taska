@@ -23,7 +23,7 @@ import type {
   TaskItem,
 } from "@/app/entities/task/model/types";
 import type { TeamItem, TeamManagerItem } from "@/app/entities/team/model/types";
-import type { TaskViewMode } from "@/app/feature/tasks/constants";
+import { TASK_VIEW_MODES, type TaskViewMode } from "@/app/feature/tasks/constants";
 import { deleteTask } from "./api/delete";
 import { getTaskComments, getTasksWorkspace, getTeamManagers } from "./api/get";
 import { patchTask } from "./api/patch";
@@ -47,7 +47,7 @@ export function useTasksWorkspace() {
   const { data: session } = useSession();
   const queryClient = useQueryClient();
 
-  const [viewMode, setViewMode] = useState<TaskViewMode>("kanban");
+  const [viewMode, setViewMode] = useState<TaskViewMode>(TASK_VIEW_MODES.kanban);
   const [searchQuery, setSearchQuery] = useState("");
   const [teamFilter, setTeamFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState<"ALL" | TaskStatus>("ALL");

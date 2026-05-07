@@ -14,7 +14,7 @@ export const registerSchema = z
       .email("Введите корректный email")
       .refine((email) => !isDisposableEmail(email), "Временные email не поддерживаются"),
     password: z.string().min(6, "Минимум 6 символов"),
-    confirmPassword: z.string().min(6),
+    confirmPassword: z.string().min(6, "Минимум 6 символов"),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Пароли не совпадают",
