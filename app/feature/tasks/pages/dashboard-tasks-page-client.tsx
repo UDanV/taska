@@ -15,7 +15,13 @@ import { Button } from "@heroui/button";
 import { Flag, Plus, Search, Users } from "lucide-react";
 import { Checkbox, Input, Spinner } from "@heroui/react";
 import { SelectItemUI, SelectUI } from "@/app/shared/components/ui/select";
-import { TASK_STATUS_LABELS, TASK_STATUSES } from "@/app/lib/workspace/constants";
+import {
+  TASK_PRIORITIES,
+  TASK_PRIORITY_LABELS,
+  TASK_STATUS_LABELS,
+  TASK_STATUSES,
+  TaskPriority,
+} from "@/app/lib/workspace/constants";
 import { TaskStatus, UserSpecialization } from "@prisma/client";
 import { USER_SPECIALIZATION_LABELS, USER_SPECIALIZATIONS } from "@/app/lib/auth/roles";
 import { TaskListView } from "@/app/feature/tasks/ui/task-views/list";
@@ -45,7 +51,7 @@ export default function DashboardTasksPageClient() {
             </div>
           ) : null}
 
-          <div className="mt-5 grid gap-3 sm:mt-6 md:grid-cols-2 xl:grid-cols-[minmax(0,1.3fr)_220px_220px_220px_auto]">
+          <div className="mt-5 grid gap-3 sm:mt-6 md:grid-cols-2 xl:grid-cols-[minmax(0,1.3fr)_220px_220px_220px_220px_auto]">
             <Input
               value={workspace.searchQuery}
               onValueChange={workspace.setSearchQuery}
@@ -112,6 +118,26 @@ export default function DashboardTasksPageClient() {
                 <SelectItemUI key={specialization}>
                   {USER_SPECIALIZATION_LABELS[specialization as keyof typeof USER_SPECIALIZATION_LABELS]}
                 </SelectItemUI>
+              ))}
+            </SelectUI>
+
+            <SelectUI 
+              placeholder="Все приоритеты"
+              selectedKeys={[workspace.priorityFilter]}
+              onChange={(event) =>
+                workspace.setPriorityFilter((event.target.value || "ALL") as "ALL" | TaskPriority)
+              }
+              items={[
+                { id: "ALL", label: "Все приоритеты" },
+                ...TASK_PRIORITIES.map((priority) => ({
+                  id: priority,
+                  label: TASK_PRIORITY_LABELS[priority],
+                })),
+              ]}
+            >
+              <SelectItemUI key="ALL">Все приоритеты</SelectItemUI>
+              {TASK_PRIORITIES.map((priority) => (
+                <SelectItemUI key={priority}>{TASK_PRIORITY_LABELS[priority]}</SelectItemUI>
               ))}
             </SelectUI>
 
@@ -210,6 +236,7 @@ export default function DashboardTasksPageClient() {
                     workspace.setTeamFilter("all");
                     workspace.setStatusFilter("ALL");
                     workspace.setSpecializationFilter("ALL");
+                    workspace.setPriorityFilter("ALL");
                     workspace.setAssignedToMeOnly(false);
                   }}
                 >

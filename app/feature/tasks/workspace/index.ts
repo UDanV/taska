@@ -10,9 +10,12 @@ import {
   type UserSpecialization,
 } from "@/app/lib/auth/roles";
 import {
+  TASK_PRIORITIES,
+  TASK_PRIORITY_LABELS,
   TASK_STATUSES,
   TASK_STATUS_LABELS,
   TEAM_COLOR_OPTIONS,
+  type TaskPriority,
   type TaskStatus,
 } from "@/app/lib/workspace/constants";
 import { fileToDataUrl } from "@/app/feature/tasks/lib/file";
@@ -51,6 +54,7 @@ export function useTasksWorkspace() {
   const [searchQuery, setSearchQuery] = useState("");
   const [teamFilter, setTeamFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState<"ALL" | TaskStatus>("ALL");
+  const [priorityFilter, setPriorityFilter] = useState<"ALL" | TaskPriority>("ALL");
   const [specializationFilter, setSpecializationFilter] = useState<"ALL" | UserSpecialization>(
     "ALL",
   );
@@ -150,6 +154,7 @@ export function useTasksWorkspace() {
       .filter((task) => {
         if (teamFilter !== "all" && task.team.id !== teamFilter) return false;
         if (statusFilter !== "ALL" && task.status !== statusFilter) return false;
+        if (priorityFilter !== "ALL" && task.priority !== priorityFilter) return false;
         if (specializationFilter !== "ALL" && task.specialization !== specializationFilter) {
           return false;
         }
@@ -171,6 +176,7 @@ export function useTasksWorkspace() {
   }, [
     assignedToMeOnly,
     currentUserId,
+    priorityFilter,
     searchQuery,
     specializationFilter,
     statusFilter,
@@ -513,6 +519,8 @@ export function useTasksWorkspace() {
     setTeamFilter,
     statusFilter,
     setStatusFilter,
+    priorityFilter,
+    setPriorityFilter,
     specializationFilter,
     setSpecializationFilter,
     assignedToMeOnly,
@@ -569,5 +577,9 @@ export function useTasksWorkspace() {
     openTaskCreateModal,
     emptyStateTitle,
     emptyStateDescription,
+    priorityOptions: TASK_PRIORITIES.map((priority) => ({
+      id: priority,
+      label: TASK_PRIORITY_LABELS[priority],
+    })),
   };
 }
