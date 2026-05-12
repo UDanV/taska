@@ -56,7 +56,13 @@ const AuthModal = ({ open, onOpenChange, initialMode }: AuthModalProps) => {
 
   const registerForm = useForm<RegisterData>({
     resolver: zodResolver(registerSchema),
-    defaultValues: { name: "", email: "", password: "", confirmPassword: "" },
+    defaultValues: {
+      name: "",
+      email: "",
+      password: "",
+      confirmPassword: "",
+      acceptPersonalDataProcessing: false,
+    },
   });
 
   const verifyRegistrationForm = useForm<VerifyRegistrationCodeData>({

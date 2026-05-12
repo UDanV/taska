@@ -1,8 +1,9 @@
 "use client";
 
 import { Eye, EyeOff } from "lucide-react";
-import { Button, Input } from "@heroui/react";
-import type { UseFormReturn } from "react-hook-form";
+import Link from "next/link";
+import { Button, Checkbox, Input } from "@heroui/react";
+import { Controller, type UseFormReturn } from "react-hook-form";
 import type { RegisterData } from "@/app/lib/validation/auth.schema";
 
 type RegisterFormProps = {
@@ -24,6 +25,8 @@ export default function RegisterForm({
   onToggleConfirmPassword,
   onSubmit,
 }: RegisterFormProps) {
+  const consentGiven = form.watch("acceptPersonalDataProcessing");
+
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
       <Input
@@ -101,7 +104,49 @@ export default function RegisterForm({
         errorMessage={form.formState.errors.confirmPassword?.message}
       />
 
-      <Button type="submit" color="primary" fullWidth isLoading={loading} className="font-medium">
+      <Controller
+        name="acceptPersonalDataProcessing"
+        control={form.control}
+        render={({ field }) => (
+          <div className="flex items-center gap-1">
+            <Checkbox
+              isSelected={field.value}
+              onValueChange={field.onChange}
+              classNames={{
+                base: "items-start gap-2 max-w-full",
+                label: "text-sm text-foreground leading-snug",
+              }}
+            >
+            </Checkbox>
+            <span>
+                Я согласен на{" "}
+                <Link
+                  href="/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-primary underline-offset-2 hover:underline"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  обработку персональных данных
+                </Link>
+              </span>
+            {form.formState.errors.acceptPersonalDataProcessing?.message ? (
+              <p className="text-xs text-danger pl-8">
+                {form.formState.errors.acceptPersonalDataProcessing.message}
+              </p>
+            ) : null}
+          </div>
+        )}
+      />
+
+      <Button
+        type="submit"
+        color="primary"
+        fullWidth
+        isLoading={loading}
+        isDisabled={!consentGiven}
+        className="font-medium"
+      >
         Создать аккаунт
       </Button>
     </form>

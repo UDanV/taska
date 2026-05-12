@@ -15,10 +15,15 @@ export const registerSchema = z
       .refine((email) => !isDisposableEmail(email), "Временные email не поддерживаются"),
     password: z.string().min(6, "Минимум 6 символов"),
     confirmPassword: z.string().min(6, "Минимум 6 символов"),
+    acceptPersonalDataProcessing: z.boolean(),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Пароли не совпадают",
     path: ["confirmPassword"],
+  })
+  .refine((data) => data.acceptPersonalDataProcessing === true, {
+    message: "Необходимо согласие на обработку персональных данных",
+    path: ["acceptPersonalDataProcessing"],
   });
 
 export const verifyRegistrationCodeSchema = z.object({
